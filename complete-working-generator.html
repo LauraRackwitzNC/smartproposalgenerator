@@ -1,0 +1,3069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Proposal Generator - Cognizant Netcentric</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'netcentric-blue': '#1e40af',
+                        'netcentric-dark': '#1e293b',
+                        'netcentric-purple': '#7c3aed',
+                        'netcentric-midnight': '#0f172a',
+                        'netcentric-plum': '#6b21a8',
+                        'netcentric-light': '#f1f5f9',
+                        'netcentric-gray': '#64748b'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        body {
+            font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 50%, #e0e7ff 100%);
+        }
+    </style>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- PDF Generation - Multiple CDN Fallbacks -->
+    <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script>
+        // Fallback CDN if first one fails
+        if (!window.jspdf) {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>');
+        }
+    </script>
+    <script>
+        // Second fallback
+        if (!window.jspdf) {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"><\/script>');
+        }
+    </script>
+    
+    <!-- PowerPoint Generation -->
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Page Components (moved outside to prevent re-creation)
+        
+        // Upload RFP Page Component
+        const UploadRFPPage = ({ 
+            rfpData, 
+            setRfpData, 
+            generatedProposal, 
+            setGeneratedProposal, 
+            handleFileUpload, 
+            analyzeRFP, 
+            generateProposalFromRFP, 
+            handleDownloadPDF, 
+            handleDownloadPowerPoint,
+            rfpLibrary,
+            currentRfpId,
+            saveCurrentRFP,
+            loadRFP,
+            deleteRFP,
+            createNewRFP
+        }) => (
+            <div>
+                <h1 className="text-4xl font-bold text-netcentric-dark mb-6">Upload RFP & Generate Proposal</h1>
+                <p className="text-xl text-netcentric-gray mb-8">Upload your RFP document and let AI create a tailored proposal response</p>
+                
+                <div className="space-y-8">
+                    {/* RFP Library Section */}
+                    {rfpLibrary.length > 0 && (
+                        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-10 h-10 bg-gradient-to-r from-netcentric-plum to-netcentric-midnight rounded-lg flex items-center justify-center">
+                                        <span className="text-white font-bold text-sm">📚</span>
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-netcentric-dark">Saved RFPs</h3>
+                                </div>
+                                <button
+                                    onClick={createNewRFP}
+                                    className="bg-gradient-to-r from-netcentric-blue to-netcentric-purple text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-300 text-sm font-medium"
+                                >
+                                    ➕ New RFP
+                                </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {rfpLibrary.map((rfp) => (
+                                    <div 
+                                        key={rfp.id} 
+                                        className={`p-4 rounded-xl border transition-all duration-300 cursor-pointer ${
+                                            currentRfpId === rfp.id 
+                                                ? 'bg-netcentric-blue/10 border-netcentric-blue shadow-md' 
+                                                : 'bg-white/60 border-netcentric-blue/20 hover:bg-netcentric-blue/5'
+                                        }`}
+                                        onClick={() => loadRFP(rfp.id)}
+                                    >
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex-1">
+                                                <h4 className="font-semibold text-netcentric-dark truncate" title={rfp.fileName}>
+                                                    📄 {rfp.fileName}
+                                                </h4>
+                                                <p className="text-xs text-netcentric-gray mt-1">
+                                                    Saved: {new Date(rfp.savedAt).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteRFP(rfp.id);
+                                                }}
+                                                className="text-red-500 hover:text-red-700 p-1 rounded transition-colors duration-200"
+                                                title="Delete RFP"
+                                            >
+                                                🗑️
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="flex items-center justify-between text-xs">
+                                            <div className="flex space-x-2">
+                                                {rfp.analysisComplete && (
+                                                    <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                                                        ✓ Analyzed
+                                                    </span>
+                                                )}
+                                                {rfp.generatedProposal && (
+                                                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                                                        ✓ Proposal
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {currentRfpId === rfp.id && (
+                                                <span className="text-netcentric-blue font-medium">Current</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Current RFP Indicator and Save Button */}
+                    {rfpData.fileName && (
+                        <div className="bg-gradient-to-r from-netcentric-blue/5 to-netcentric-purple/5 rounded-2xl p-6 border border-netcentric-blue/10">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3">
+                                    <span className="text-2xl">📄</span>
+                                    <div>
+                                        <h4 className="font-semibold text-netcentric-dark">
+                                            Current RFP: {rfpData.fileName}
+                                        </h4>
+                                        <p className="text-sm text-netcentric-gray">
+                                            {currentRfpId ? 'Loaded from library' : 'New upload (not saved)'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={saveCurrentRFP}
+                                    className="bg-gradient-to-r from-netcentric-purple to-netcentric-plum text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-300 text-sm font-medium"
+                                >
+                                    💾 Save RFP
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    {/* File Upload Section */}
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                        <div className="flex items-center space-x-3 mb-6">
+                            <div className="w-10 h-10 bg-gradient-to-r from-netcentric-blue to-netcentric-purple rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">📤</span>
+                            </div>
+                            <h3 className="text-2xl font-bold text-netcentric-dark">Upload RFP Document</h3>
+                        </div>
+                        
+                        <div className="border-2 border-dashed border-netcentric-blue/30 rounded-xl p-8 text-center hover:border-netcentric-blue/50 transition-colors duration-300">
+                            <input
+                                key="rfp-file-input"
+                                type="file"
+                                accept=".pdf,.docx,.txt"
+                                onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    if (file) handleFileUpload(file);
+                                }}
+                                className="hidden"
+                                id="rfp-upload"
+                            />
+                            <label htmlFor="rfp-upload" className="cursor-pointer">
+                                <div className="flex flex-col items-center space-y-4">
+                                    <div className="w-16 h-16 bg-netcentric-blue/10 rounded-full flex items-center justify-center">
+                                        <span className="text-3xl">📄</span>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-lg font-semibold text-netcentric-dark mb-2">Drop your RFP here or click to browse</h4>
+                                        <p className="text-netcentric-gray">Supports PDF, DOCX, and TXT files (Max 10MB)</p>
+                                    </div>
+                                    {rfpData.fileName && (
+                                        <div className="bg-netcentric-blue/10 px-4 py-2 rounded-lg">
+                                            <span className="text-netcentric-blue font-medium">📎 {rfpData.fileName}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </label>
+                        </div>
+                        
+                        {rfpData.uploadedFile && !rfpData.analysisComplete && (
+                            <div className="mt-6 text-center">
+                                <button
+                                    onClick={analyzeRFP}
+                                    disabled={rfpData.isAnalyzing}
+                                    className="bg-gradient-to-r from-netcentric-purple to-netcentric-plum text-white px-8 py-4 rounded-2xl hover:shadow-xl text-lg font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {rfpData.isAnalyzing ? '🤖 Analyzing RFP...' : '🔍 Analyze RFP with AI'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* RFP Analysis Results */}
+                    {rfpData.analysisComplete && (
+                        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                            <div className="flex items-center space-x-3 mb-6">
+                                <div className="w-10 h-10 bg-gradient-to-r from-netcentric-purple to-netcentric-plum rounded-lg flex items-center justify-center">
+                                    <span className="text-white font-bold text-sm">🔍</span>
+                                </div>
+                                <h3 className="text-2xl font-bold text-netcentric-dark">RFP Analysis Results</h3>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 className="text-lg font-semibold text-netcentric-dark mb-3">Executive Summary</h4>
+                                    <div className="bg-netcentric-light/30 p-4 rounded-xl">
+                                        <p className="text-netcentric-dark text-sm">{rfpData.analysis.executiveSummary}</p>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4 className="text-lg font-semibold text-netcentric-dark mb-3">Timeline & Deadlines</h4>
+                                    <div className="bg-netcentric-light/30 p-4 rounded-xl">
+                                        <p className="text-netcentric-dark text-sm">{rfpData.analysis.timeline}</p>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4 className="text-lg font-semibold text-netcentric-dark mb-3">Key Requirements</h4>
+                                    <div className="bg-netcentric-light/30 p-4 rounded-xl">
+                                        <ul className="text-netcentric-dark text-sm space-y-1">
+                                            {rfpData.analysis.keyRequirements.map((req, index) => (
+                                                <li key={index} className="flex items-start space-x-2">
+                                                    <span className="text-netcentric-blue mt-1">•</span>
+                                                    <span>{req}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4 className="text-lg font-semibold text-netcentric-dark mb-3">Evaluation Criteria</h4>
+                                    <div className="bg-netcentric-light/30 p-4 rounded-xl">
+                                        <ul className="text-netcentric-dark text-sm space-y-1">
+                                            {rfpData.analysis.evaluationCriteria.map((criteria, index) => (
+                                                <li key={index} className="flex items-start space-x-2">
+                                                    <span className="text-netcentric-purple mt-1">•</span>
+                                                    <span>{criteria}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                <div className="lg:col-span-2">
+                                    <h4 className="text-lg font-semibold text-netcentric-dark mb-3">Stakeholders</h4>
+                                    <div className="bg-netcentric-light/30 p-4 rounded-xl">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                            {rfpData.analysis.stakeholders.map((stakeholder, index) => (
+                                                <div key={index} className="bg-white/50 p-2 rounded-lg text-center">
+                                                    <span className="text-netcentric-dark text-sm font-medium">{stakeholder}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="lg:col-span-2">
+                                    <h4 className="text-lg font-semibold text-netcentric-dark mb-3">Submission Format</h4>
+                                    <div className="bg-netcentric-light/30 p-4 rounded-xl">
+                                        <p className="text-netcentric-dark text-sm">{rfpData.analysis.submissionFormat}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="mt-8 text-center">
+                                <button
+                                    onClick={generateProposalFromRFP}
+                                    disabled={generatedProposal.isGenerating}
+                                    className="bg-gradient-to-r from-netcentric-plum to-netcentric-midnight text-white px-8 py-4 rounded-2xl hover:shadow-xl text-lg font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {generatedProposal.isGenerating ? '🤖 Generating Proposal...' : '⚡ Generate Tailored Proposal'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Generated Proposal Content */}
+                    {generatedProposal.generationComplete && (
+                        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-10 h-10 bg-gradient-to-r from-netcentric-plum to-netcentric-midnight rounded-lg flex items-center justify-center">
+                                        <span className="text-white font-bold text-sm">📋</span>
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-netcentric-dark">Generated Proposal</h3>
+                                </div>
+                                <div className="flex space-x-3">
+                                    <button
+                                        onClick={handleDownloadPDF}
+                                        className="bg-gradient-to-r from-netcentric-blue to-netcentric-purple text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-300 text-sm font-medium"
+                                    >
+                                        📄 Download PDF
+                                    </button>
+                                    <button
+                                        onClick={handleDownloadPowerPoint}
+                                        className="bg-gradient-to-r from-netcentric-purple to-netcentric-plum text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-300 text-sm font-medium"
+                                    >
+                                        📊 Download PPT
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-8">
+                                <div>
+                                    <h4 className="text-xl font-semibold text-netcentric-dark mb-4 flex items-center space-x-2">
+                                        <span>💌</span>
+                                        <span>Cover Letter</span>
+                                    </h4>
+                                    <div className="bg-netcentric-light/20 p-6 rounded-xl">
+                                        <textarea
+                                            key="cover-letter-textarea"
+                                            rows="8"
+                                            value={generatedProposal.coverLetter}
+                                            onChange={(e) => setGeneratedProposal(prev => ({
+                                                ...prev,
+                                                coverLetter: e.target.value
+                                            }))}
+                                            className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h4 className="text-xl font-semibold text-netcentric-dark mb-4 flex items-center space-x-2">
+                                        <span>🎯</span>
+                                        <span>Solution Overview</span>
+                                    </h4>
+                                    <div className="bg-netcentric-light/20 p-6 rounded-xl">
+                                        <textarea
+                                            key="solution-overview-generated-textarea"
+                                            rows="6"
+                                            value={generatedProposal.solutionOverview}
+                                            onChange={(e) => setGeneratedProposal(prev => ({
+                                                ...prev,
+                                                solutionOverview: e.target.value
+                                            }))}
+                                            className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div>
+                                        <h4 className="text-xl font-semibold text-netcentric-dark mb-4 flex items-center space-x-2">
+                                            <span>👥</span>
+                                            <span>Team Structure</span>
+                                        </h4>
+                                        <div className="bg-netcentric-light/20 p-6 rounded-xl">
+                                            <textarea
+                                                key="team-structure-textarea"
+                                                rows="8"
+                                                value={generatedProposal.teamStructure}
+                                                onChange={(e) => setGeneratedProposal(prev => ({
+                                                    ...prev,
+                                                    teamStructure: e.target.value
+                                                }))}
+                                                className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h4 className="text-xl font-semibold text-netcentric-dark mb-4 flex items-center space-x-2">
+                                            <span>📅</span>
+                                            <span>Delivery Timeline</span>
+                                        </h4>
+                                        <div className="bg-netcentric-light/20 p-6 rounded-xl">
+                                            <textarea
+                                                key="delivery-timeline-textarea"
+                                                rows="8"
+                                                value={generatedProposal.deliveryTimeline}
+                                                onChange={(e) => setGeneratedProposal(prev => ({
+                                                    ...prev,
+                                                    deliveryTimeline: e.target.value
+                                                }))}
+                                                className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h4 className="text-xl font-semibold text-netcentric-dark mb-4 flex items-center space-x-2">
+                                        <span>📝</span>
+                                        <span>Assumptions & Dependencies</span>
+                                    </h4>
+                                    <div className="bg-netcentric-light/20 p-6 rounded-xl">
+                                        <textarea
+                                            key="assumptions-generated-textarea"
+                                            rows="6"
+                                            value={generatedProposal.assumptions}
+                                            onChange={(e) => setGeneratedProposal(prev => ({
+                                                ...prev,
+                                                assumptions: e.target.value
+                                            }))}
+                                            className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h4 className="text-xl font-semibold text-netcentric-dark mb-4 flex items-center space-x-2">
+                                        <span>📚</span>
+                                        <span>Suggested Case Studies</span>
+                                    </h4>
+                                    <div className="bg-netcentric-light/20 p-6 rounded-xl">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {generatedProposal.suggestedCaseStudies.map((caseStudy, index) => (
+                                                <div key={index} className="bg-white/60 p-4 rounded-lg border border-netcentric-blue/10">
+                                                    <div className="flex items-start space-x-3">
+                                                        <span className="text-netcentric-blue text-lg">📊</span>
+                                                        <span className="text-netcentric-dark font-medium text-sm">{caseStudy}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+
+        const CreatePage = ({ 
+            selectedTemplate, 
+            setSelectedTemplate, 
+            templates, 
+            proposalData, 
+            setProposalData, 
+            generateExecutiveSummary, 
+            handleSaveDraft, 
+            handleDownloadPDF, 
+            handleDownloadPowerPoint 
+        }) => (
+            <div>
+                <h1 className="text-4xl font-bold text-netcentric-dark mb-6">Create Adobe-Powered Proposal</h1>
+                
+                <div className="space-y-8">
+                    {/* Template Selection */}
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                        <h3 className="text-xl font-bold text-netcentric-dark mb-4">Select Adobe Template</h3>
+                        <select
+                            value={selectedTemplate}
+                            onChange={(e) => setSelectedTemplate(e.target.value)}
+                            className="w-full border-2 border-netcentric-blue/20 rounded-2xl px-4 py-4 text-lg focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 bg-white"
+                        >
+                            <option value="">Choose an Adobe template...</option>
+                            {templates.map(template => (
+                                <option key={template.id} value={template.id}>{template.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* 1. Customer Context */}
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                        <div className="flex items-center space-x-3 mb-6">
+                            <div className="w-10 h-10 bg-gradient-to-r from-netcentric-blue to-netcentric-purple rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">1</span>
+                            </div>
+                            <h3 className="text-2xl font-bold text-netcentric-dark">Customer Context</h3>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Customer Name *</label>
+                                <input
+                                    key="customer-name-input"
+                                    type="text"
+                                    value={proposalData.customerContext?.customerName || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        customerContext: { ...prev.customerContext, customerName: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                    placeholder="Enter customer name"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Industry / Sector</label>
+                                <select
+                                    key="industry-select"
+                                    value={proposalData.customerContext?.industry || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        customerContext: { ...prev.customerContext, industry: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                >
+                                    <option value="">Select industry...</option>
+                                    <option value="retail">Retail & E-commerce</option>
+                                    <option value="financial">Financial Services</option>
+                                    <option value="healthcare">Healthcare</option>
+                                    <option value="manufacturing">Manufacturing</option>
+                                    <option value="technology">Technology</option>
+                                    <option value="media">Media & Entertainment</option>
+                                    <option value="education">Education</option>
+                                    <option value="government">Government</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Company Size</label>
+                                <select
+                                    key="company-size-select"
+                                    value={proposalData.customerContext?.companySize || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        customerContext: { ...prev.customerContext, companySize: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                >
+                                    <option value="">Select company size...</option>
+                                    <option value="small">Small (1-100 employees)</option>
+                                    <option value="mid-market">Mid-Market (101-1,000 employees)</option>
+                                    <option value="enterprise">Enterprise (1,000+ employees)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Geography / Region</label>
+                                <input
+                                    key="geography-input"
+                                    type="text"
+                                    value={proposalData.customerContext?.geography || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        customerContext: { ...prev.customerContext, geography: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                    placeholder="e.g., North America, EMEA, APAC"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mt-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Current Challenges or Pain Points</label>
+                                <textarea
+                                    key="challenges-textarea"
+                                    rows="3"
+                                    value={proposalData.customerContext?.challenges || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        customerContext: { ...prev.customerContext, challenges: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                    placeholder="Describe current business challenges and pain points..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Existing Tech Stack</label>
+                                <textarea
+                                    key="tech-stack-textarea"
+                                    rows="3"
+                                    value={proposalData.customerContext?.techStack || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        customerContext: { ...prev.customerContext, techStack: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                    placeholder="List current technologies, platforms, and tools..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Strategic Priorities / Business Goals</label>
+                                <textarea
+                                    key="priorities-textarea"
+                                    rows="3"
+                                    value={proposalData.customerContext?.priorities || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        customerContext: { ...prev.customerContext, priorities: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                    placeholder="Describe key business objectives and strategic initiatives..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Key Stakeholders</label>
+                                <textarea
+                                    key="stakeholders-textarea"
+                                    rows="3"
+                                    value={proposalData.customerContext?.stakeholders || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        customerContext: { ...prev.customerContext, stakeholders: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                    placeholder="List key decision makers and their roles..."
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 2. Opportunity Details */}
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                        <div className="flex items-center space-x-3 mb-6">
+                            <div className="w-10 h-10 bg-gradient-to-r from-netcentric-purple to-netcentric-plum rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">2</span>
+                            </div>
+                            <h3 className="text-2xl font-bold text-netcentric-dark">Opportunity Details</h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Opportunity Name *</label>
+                                <input
+                                    key="opportunity-name-input"
+                                    type="text"
+                                    value={proposalData.opportunityDetails?.opportunityName || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        opportunityDetails: { ...prev.opportunityDetails, opportunityName: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                    placeholder="Enter opportunity name"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Opportunity Type</label>
+                                <select
+                                    key="opportunity-type-select"
+                                    value={proposalData.opportunityDetails?.opportunityType || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        opportunityDetails: { ...prev.opportunityDetails, opportunityType: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                >
+                                    <option value="">Select opportunity type...</option>
+                                    <option value="workshop">Workshop</option>
+                                    <option value="implementation">Implementation</option>
+                                    <option value="advisory">Advisory</option>
+                                    <option value="managed-services">Managed Services</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Stage of Sales Cycle</label>
+                                <select
+                                    key="sales-stage-select"
+                                    value={proposalData.opportunityDetails?.salesStage || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        opportunityDetails: { ...prev.opportunityDetails, salesStage: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                >
+                                    <option value="">Select sales stage...</option>
+                                    <option value="discovery">Discovery</option>
+                                    <option value="proposal">Proposal</option>
+                                    <option value="negotiation">Contract Negotiation</option>
+                                    <option value="closed-won">Closed Won</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Budget Range</label>
+                                <input
+                                    key="budget-input"
+                                    type="text"
+                                    value={proposalData.opportunityDetails?.budget || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        opportunityDetails: { ...prev.opportunityDetails, budget: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                    placeholder="e.g., $100K - $500K"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Timeline / Key Milestones</label>
+                                <input
+                                    key="timeline-input"
+                                    type="text"
+                                    value={proposalData.opportunityDetails?.timeline || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        opportunityDetails: { ...prev.opportunityDetails, timeline: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                    placeholder="e.g., Q2 2024 kick-off, 6-month implementation"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Decision Criteria</label>
+                                <div className="space-y-2">
+                                    {['Cost', 'Speed', 'Innovation', 'Trust', 'Brand'].map(criteria => (
+                                        <label key={criteria} className="flex items-center space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={proposalData.opportunityDetails?.decisionCriteria?.includes(criteria) || false}
+                                                onChange={(e) => {
+                                                    const current = proposalData.opportunityDetails?.decisionCriteria || [];
+                                                    const updated = e.target.checked 
+                                                        ? [...current, criteria]
+                                                        : current.filter(c => c !== criteria);
+                                                    setProposalData(prev => ({
+                                                        ...prev,
+                                                        opportunityDetails: { ...prev.opportunityDetails, decisionCriteria: updated }
+                                                    }));
+                                                }}
+                                                className="w-4 h-4 text-netcentric-blue focus:ring-netcentric-blue border-netcentric-blue/30 rounded"
+                                            />
+                                            <span className="text-sm text-netcentric-dark">{criteria}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 3. Proposed Solution */}
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                        <div className="flex items-center space-x-3 mb-6">
+                            <div className="w-10 h-10 bg-gradient-to-r from-netcentric-plum to-netcentric-midnight rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">3</span>
+                            </div>
+                            <h3 className="text-2xl font-bold text-netcentric-dark">Proposed Solution</h3>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Solution Overview</label>
+                                <textarea
+                                    key="solution-overview-textarea"
+                                    rows="4"
+                                    value={proposalData.proposedSolution?.overview || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        proposedSolution: { ...prev.proposedSolution, overview: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                    placeholder="Provide a high-level overview of the proposed solution..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Products / Services Offered</label>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    {['AEP', 'Marketo', 'Target', 'Analytics', 'AEM', 'Strategy Workshop', 'Implementation Services', 'Training', 'Managed Services'].map(service => (
+                                        <label key={service} className="flex items-center space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={proposalData.proposedSolution?.services?.includes(service) || false}
+                                                onChange={(e) => {
+                                                    const current = proposalData.proposedSolution?.services || [];
+                                                    const updated = e.target.checked 
+                                                        ? [...current, service]
+                                                        : current.filter(s => s !== service);
+                                                    setProposalData(prev => ({
+                                                        ...prev,
+                                                        proposedSolution: { ...prev.proposedSolution, services: updated }
+                                                    }));
+                                                }}
+                                                className="w-4 h-4 text-netcentric-blue focus:ring-netcentric-blue border-netcentric-blue/30 rounded"
+                                            />
+                                            <span className="text-sm text-netcentric-dark">{service}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Use Cases Addressed</label>
+                                <textarea
+                                    key="use-cases-textarea"
+                                    rows="3"
+                                    value={proposalData.proposedSolution?.useCases || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        proposedSolution: { ...prev.proposedSolution, useCases: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                    placeholder="Describe specific use cases and scenarios addressed..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Expected Outcomes</label>
+                                <textarea
+                                    key="outcomes-textarea"
+                                    rows="3"
+                                    value={proposalData.proposedSolution?.outcomes || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        proposedSolution: { ...prev.proposedSolution, outcomes: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                    placeholder="Describe expected business outcomes and benefits..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Key Differentiators</label>
+                                <textarea
+                                    key="differentiators-textarea"
+                                    rows="3"
+                                    value={proposalData.proposedSolution?.differentiators || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        proposedSolution: { ...prev.proposedSolution, differentiators: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                    placeholder="Highlight what makes this solution unique..."
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 4. Team & Delivery */}
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                        <div className="flex items-center space-x-3 mb-6">
+                            <div className="w-10 h-10 bg-gradient-to-r from-netcentric-blue to-netcentric-purple rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">4</span>
+                            </div>
+                            <h3 className="text-2xl font-bold text-netcentric-dark">Team & Delivery</h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Delivery Model</label>
+                                <select
+                                    key="delivery-model-select"
+                                    value={proposalData.teamDelivery?.deliveryModel || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        teamDelivery: { ...prev.teamDelivery, deliveryModel: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                >
+                                    <option value="">Select delivery model...</option>
+                                    <option value="on-site">On-site</option>
+                                    <option value="remote">Remote</option>
+                                    <option value="hybrid">Hybrid</option>
+                                    <option value="managed-service">Managed Service</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Timeline Estimate</label>
+                                <input
+                                    key="delivery-timeline-input"
+                                    type="text"
+                                    value={proposalData.teamDelivery?.timelineEstimate || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        teamDelivery: { ...prev.teamDelivery, timelineEstimate: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                    placeholder="e.g., 3-6 months"
+                                />
+                            </div>
+                        </div>
+                        <div className="mt-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Proposed Team Members</label>
+                                <textarea
+                                    key="team-members-textarea"
+                                    rows="4"
+                                    value={proposalData.teamDelivery?.teamMembers || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        teamDelivery: { ...prev.teamDelivery, teamMembers: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                    placeholder="List key team members, their roles, and brief bios..."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Partners Involved</label>
+                                <input
+                                    key="partners-input"
+                                    type="text"
+                                    value={proposalData.teamDelivery?.partners || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        teamDelivery: { ...prev.teamDelivery, partners: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                    placeholder="e.g., Adobe, Cognizant"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 5. Commercials & Scope */}
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                        <div className="flex items-center space-x-3 mb-6">
+                            <div className="w-10 h-10 bg-gradient-to-r from-netcentric-purple to-netcentric-plum rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">5</span>
+                            </div>
+                            <h3 className="text-2xl font-bold text-netcentric-dark">Commercials & Scope</h3>
+                        </div>
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Pricing Estimate</label>
+                                <textarea
+                                    key="pricing-textarea"
+                                    rows="3"
+                                    value={proposalData.commercials?.pricing || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        commercials: { ...prev.commercials, pricing: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                    placeholder="Breakdown of pricing components and estimates..."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Scope of Work</label>
+                                <textarea
+                                    key="scope-textarea"
+                                    rows="4"
+                                    value={proposalData.commercials?.scope || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        commercials: { ...prev.commercials, scope: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                    placeholder="Detailed scope of work and deliverables..."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Assumptions & Dependencies</label>
+                                <textarea
+                                    key="assumptions-textarea"
+                                    rows="3"
+                                    value={proposalData.commercials?.assumptions || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        commercials: { ...prev.commercials, assumptions: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                    placeholder="Key assumptions and dependencies for this proposal..."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Next Steps / Call to Action</label>
+                                <textarea
+                                    key="next-steps-textarea"
+                                    rows="3"
+                                    value={proposalData.commercials?.nextSteps || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        commercials: { ...prev.commercials, nextSteps: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                    placeholder="Define clear next steps and call to action..."
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 6. Extras & Options */}
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                        <div className="flex items-center space-x-3 mb-6">
+                            <div className="w-10 h-10 bg-gradient-to-r from-netcentric-plum to-netcentric-midnight rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">6</span>
+                            </div>
+                            <h3 className="text-2xl font-bold text-netcentric-dark">Extras & Options</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Proposal Tone/Style</label>
+                                <select
+                                    key="proposal-tone-select"
+                                    value={proposalData.extras?.tone || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        extras: { ...prev.extras, tone: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                >
+                                    <option value="">Select tone...</option>
+                                    <option value="formal">Formal</option>
+                                    <option value="executive">Executive</option>
+                                    <option value="technical">Technical</option>
+                                    <option value="persuasive">Persuasive</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Proposal Format</label>
+                                <select
+                                    key="proposal-format-select"
+                                    value={proposalData.extras?.format || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        extras: { ...prev.extras, format: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                >
+                                    <option value="">Select format...</option>
+                                    <option value="pdf">PDF</option>
+                                    <option value="powerpoint">PowerPoint</option>
+                                    <option value="web-link">Web Link</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Internal Owner</label>
+                                <input
+                                    key="internal-owner-input"
+                                    type="text"
+                                    value={proposalData.extras?.internalOwner || ''}
+                                    onChange={(e) => setProposalData(prev => ({
+                                        ...prev,
+                                        extras: { ...prev.extras, internalOwner: e.target.value }
+                                    }))}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                    placeholder="Enter internal proposal owner"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Attachments Needed</label>
+                                <div className="space-y-2">
+                                    {['Case Studies', 'Team Bios', 'Product Sheets', 'References'].map(attachment => (
+                                        <label key={attachment} className="flex items-center space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={proposalData.extras?.attachments?.includes(attachment) || false}
+                                                onChange={(e) => {
+                                                    const current = proposalData.extras?.attachments || [];
+                                                    const updated = e.target.checked 
+                                                        ? [...current, attachment]
+                                                        : current.filter(a => a !== attachment);
+                                                    setProposalData(prev => ({
+                                                        ...prev,
+                                                        extras: { ...prev.extras, attachments: updated }
+                                                    }));
+                                                }}
+                                                className="w-4 h-4 text-netcentric-blue focus:ring-netcentric-blue border-netcentric-blue/30 rounded"
+                                            />
+                                            <span className="text-sm text-netcentric-dark">{attachment}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="bg-gradient-to-r from-netcentric-blue/5 to-netcentric-purple/5 rounded-2xl p-8 border border-netcentric-blue/10">
+                        <div className="flex flex-wrap gap-4 justify-center">
+                            <button
+                                onClick={handleSaveDraft}
+                                className="bg-gradient-to-r from-netcentric-blue to-netcentric-purple text-white px-8 py-4 rounded-2xl hover:shadow-xl text-lg font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:scale-105"
+                            >
+                                💾 Save Draft
+                            </button>
+                            <button
+                                onClick={generateExecutiveSummary}
+                                className="bg-gradient-to-r from-netcentric-purple to-netcentric-plum text-white px-8 py-4 rounded-2xl hover:shadow-xl text-lg font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:scale-105"
+                            >
+                                🤖 Generate AI Summary
+                            </button>
+                            <button
+                                onClick={handleDownloadPDF}
+                                className="bg-gradient-to-r from-netcentric-plum to-netcentric-midnight text-white px-8 py-4 rounded-2xl hover:shadow-xl text-lg font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:scale-105"
+                            >
+                                📄 Generate PDF
+                            </button>
+                            <button
+                                onClick={handleDownloadPowerPoint}
+                                className="bg-gradient-to-r from-netcentric-midnight to-netcentric-blue text-white px-8 py-4 rounded-2xl hover:shadow-xl text-lg font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:scale-105"
+                            >
+                                📊 Generate PowerPoint
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+        const HomePage = ({ handleNavigate, setSelectedTemplate, templates, sampleProposals }) => (
+            <div>
+                <div className="mb-8">
+                    <h1 className="text-5xl font-bold text-netcentric-dark mb-4">Welcome to Smart Proposal Generator</h1>
+                    <p className="text-xl text-netcentric-gray mb-8">Create professional, winning proposals in minutes with Adobe-powered solutions</p>
+                    
+                    <div className="bg-gradient-to-br from-netcentric-blue via-netcentric-purple to-netcentric-plum rounded-3xl text-white p-8 shadow-2xl border border-netcentric-blue/20">
+                        <h2 className="text-3xl font-bold mb-4">Ready to Create Your Next Winning Proposal?</h2>
+                        <p className="text-netcentric-light/90 mb-6 text-lg">Choose from our specialized Adobe templates and accelerate your digital transformation proposals</p>
+                        <button 
+                            onClick={() => handleNavigate('create')}
+                            className="bg-white text-netcentric-blue px-8 py-4 rounded-2xl hover:bg-netcentric-light transition-all duration-300 font-bold text-lg shadow-lg transform hover:-translate-y-1 hover:scale-105"
+                        >
+                            Create New Proposal
+                        </button>
+                    </div>
+                </div>
+
+                {/* Templates */}
+                <div className="mb-12">
+                    <h2 className="text-3xl font-bold text-netcentric-dark mb-6">Choose Your Adobe Template</h2>
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                        <div className="lg:row-span-2">
+                            <div className="bg-gradient-to-br from-netcentric-purple to-netcentric-plum text-white rounded-2xl p-8 cursor-pointer hover:shadow-2xl transition-all duration-300 h-full flex flex-col justify-center transform hover:-translate-y-2 hover:scale-105 border border-netcentric-purple/20"
+                                 onClick={() => {
+                                     setSelectedTemplate('custom');
+                                     handleNavigate('create');
+                                 }}>
+                                <div className="text-4xl mb-4">🎨</div>
+                                <h3 className="text-xl font-bold mb-3">Custom Proposal</h3>
+                                <p className="text-netcentric-light/90">Start from scratch and build your proposal exactly how you want it with full Adobe integration.</p>
+                            </div>
+                        </div>
+                        
+                        {templates.slice(0, 6).map((template) => (
+                            <div
+                                key={template.id}
+                                onClick={() => {
+                                    setSelectedTemplate(template.id);
+                                    handleNavigate('create');
+                                }}
+                                className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-6 cursor-pointer hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:border-netcentric-purple/30"
+                            >
+                                <div className="text-3xl mb-4">{template.icon}</div>
+                                <h3 className="text-lg font-bold text-netcentric-dark mb-3">{template.name}</h3>
+                                <p className="text-netcentric-gray text-sm mb-3 leading-relaxed">{template.description}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Recent Proposals */}
+                <div className="mb-8">
+                    <h2 className="text-3xl font-bold text-netcentric-dark mb-6">Recent Adobe Proposals</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {sampleProposals.map((proposal) => (
+                            <div key={proposal.id} className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-6 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:border-netcentric-purple/30">
+                                <h3 className="font-bold text-netcentric-dark mb-3 text-lg">{proposal.title}</h3>
+                                <p className="text-sm text-netcentric-gray mb-3 font-medium">{proposal.client}</p>
+                                <p className="text-lg font-bold text-netcentric-blue mb-4">{proposal.value}</p>
+                                <span className="px-4 py-2 bg-gradient-to-r from-netcentric-blue/10 to-netcentric-purple/10 text-netcentric-blue rounded-full text-sm font-medium border border-netcentric-blue/20">
+                                    {proposal.status}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+
+        const DashboardPage = () => (
+            <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-6">Dashboard</h1>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div className="bg-white rounded-lg shadow-sm border p-6">
+                        <h3 className="text-lg font-semibold mb-2">Total Proposals</h3>
+                        <p className="text-3xl font-bold text-blue-600">24</p>
+                    </div>
+                    <div className="bg-white rounded-lg shadow-sm border p-6">
+                        <h3 className="text-lg font-semibold mb-2">Won Proposals</h3>
+                        <p className="text-3xl font-bold text-green-600">18</p>
+                    </div>
+                    <div className="bg-white rounded-lg shadow-sm border p-6">
+                        <h3 className="text-lg font-semibold mb-2">Total Value</h3>
+                        <p className="text-3xl font-bold text-purple-600">$2.1M</p>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const TemplatesPage = ({ templates, setSelectedTemplate, handleNavigate }) => (
+            <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-6">Templates</h1>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {templates.map((template) => (
+                        <div key={template.id} className="bg-white rounded-xl shadow-sm border p-6 cursor-pointer hover:shadow-lg transition-all">
+                            <div className="text-3xl mb-4">{template.icon}</div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">{template.name}</h3>
+                            <p className="text-gray-600 text-sm mb-4">{template.description}</p>
+                            <button 
+                                onClick={() => {
+                                    setSelectedTemplate(template.id);
+                                    handleNavigate('create');
+                                }}
+                                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
+                            >
+                                Use Template
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+
+        const ProposalsPage = ({ sampleProposals }) => (
+            <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-6">All Proposals</h1>
+                <div className="bg-white rounded-lg shadow-sm border">
+                    <div className="p-6">
+                        <div className="space-y-4">
+                            {sampleProposals.map((proposal) => (
+                                <div key={proposal.id} className="border rounded-lg p-4 flex justify-between items-center">
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900">{proposal.title}</h3>
+                                        <p className="text-sm text-gray-600">Client: {proposal.client}</p>
+                                        <p className="text-sm text-gray-600">Template: {proposal.template}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-semibold text-gray-900">{proposal.value}</p>
+                                        <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
+                                            {proposal.status}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const AnalyticsPage = () => (
+            <div>
+                <h1 className="text-4xl font-bold text-netcentric-dark mb-6">Proposal Analytics & Insights</h1>
+                
+                {/* Key Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-semibold text-netcentric-gray uppercase tracking-wide">Total Proposals</h3>
+                            <div className="w-8 h-8 bg-gradient-to-r from-netcentric-blue to-netcentric-purple rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">P</span>
+                </div>
+            </div>
+                        <p className="text-3xl font-bold text-netcentric-dark">127</p>
+                        <p className="text-sm text-green-600 font-medium mt-2">↗ +12% from last month</p>
+                    </div>
+
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-semibold text-netcentric-gray uppercase tracking-wide">Win Rate</h3>
+                            <div className="w-8 h-8 bg-gradient-to-r from-netcentric-purple to-netcentric-plum rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">W</span>
+                            </div>
+                        </div>
+                        <p className="text-3xl font-bold text-netcentric-dark">73%</p>
+                        <p className="text-sm text-green-600 font-medium mt-2">↗ +5.2% from last quarter</p>
+                    </div>
+
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-semibold text-netcentric-gray uppercase tracking-wide">Avg. Value</h3>
+                            <div className="w-8 h-8 bg-gradient-to-r from-netcentric-plum to-netcentric-midnight rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">$</span>
+                            </div>
+                        </div>
+                        <p className="text-3xl font-bold text-netcentric-dark">$156K</p>
+                        <p className="text-sm text-green-600 font-medium mt-2">↗ +8.1% from last month</p>
+                    </div>
+
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-semibold text-netcentric-gray uppercase tracking-wide">Time to Close</h3>
+                            <div className="w-8 h-8 bg-gradient-to-r from-netcentric-blue to-netcentric-plum rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">T</span>
+                            </div>
+                        </div>
+                        <p className="text-3xl font-bold text-netcentric-dark">18d</p>
+                        <p className="text-sm text-red-600 font-medium mt-2">↘ -2.3 days faster</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    {/* Proposal Success by Template */}
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                        <h3 className="text-xl font-bold text-netcentric-dark mb-6">Template Performance</h3>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <span className="text-netcentric-gray font-medium">AEM Implementation</span>
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                                        <div className="bg-gradient-to-r from-netcentric-blue to-netcentric-purple h-2 rounded-full" style={{width: '85%'}}></div>
+                                    </div>
+                                    <span className="text-netcentric-dark font-bold text-sm">85%</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-netcentric-gray font-medium">Digital Strategy</span>
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                                        <div className="bg-gradient-to-r from-netcentric-purple to-netcentric-plum h-2 rounded-full" style={{width: '78%'}}></div>
+                                    </div>
+                                    <span className="text-netcentric-dark font-bold text-sm">78%</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-netcentric-gray font-medium">Analytics Optimization</span>
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                                        <div className="bg-gradient-to-r from-netcentric-plum to-netcentric-midnight h-2 rounded-full" style={{width: '92%'}}></div>
+                                    </div>
+                                    <span className="text-netcentric-dark font-bold text-sm">92%</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-netcentric-gray font-medium">CDP & Personalization</span>
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                                        <div className="bg-gradient-to-r from-netcentric-blue to-netcentric-purple h-2 rounded-full" style={{width: '71%'}}></div>
+                                    </div>
+                                    <span className="text-netcentric-dark font-bold text-sm">71%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Recent Activity */}
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                        <h3 className="text-xl font-bold text-netcentric-dark mb-6">Recent Activity</h3>
+                        <div className="space-y-4">
+                            <div className="flex items-start space-x-3">
+                                <div className="w-3 h-3 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+            <div>
+                                    <p className="text-netcentric-dark font-medium">Adobe Experience Cloud proposal won</p>
+                                    <p className="text-sm text-netcentric-gray">RetailCorp - $125,000 • 2 hours ago</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start space-x-3">
+                                <div className="w-3 h-3 bg-netcentric-blue rounded-full mt-2 flex-shrink-0"></div>
+                                <div>
+                                    <p className="text-netcentric-dark font-medium">New AEM proposal created</p>
+                                    <p className="text-sm text-netcentric-gray">ManufacturingInc - Draft • 5 hours ago</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start space-x-3">
+                                <div className="w-3 h-3 bg-netcentric-purple rounded-full mt-2 flex-shrink-0"></div>
+                                <div>
+                                    <p className="text-netcentric-dark font-medium">Analytics proposal submitted</p>
+                                    <p className="text-sm text-netcentric-gray">TechStart - Under Review • 1 day ago</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start space-x-3">
+                                <div className="w-3 h-3 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></div>
+                                <div>
+                                    <p className="text-netcentric-dark font-medium">CDP proposal follow-up needed</p>
+                                    <p className="text-sm text-netcentric-gray">FinanceFirst - Action Required • 2 days ago</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start space-x-3">
+                                <div className="w-3 h-3 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                                <div>
+                                    <p className="text-netcentric-dark font-medium">Digital Strategy proposal accepted</p>
+                                    <p className="text-sm text-netcentric-gray">GlobalCorp - $180,000 • 3 days ago</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Insights and Recommendations */}
+                <div className="bg-gradient-to-br from-netcentric-midnight to-netcentric-dark rounded-3xl text-white p-8 shadow-2xl">
+                    <h3 className="text-2xl font-bold mb-6">AI-Powered Insights</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                            <h4 className="text-lg font-bold mb-3 text-netcentric-light">🎯 Top Performing Elements</h4>
+                            <ul className="space-y-2 text-netcentric-light/90">
+                                <li>• Executive summaries with ROI projections increase win rate by 23%</li>
+                                <li>• Proposals with Adobe case studies have 31% higher success</li>
+                                <li>• Including implementation timelines boosts acceptance by 18%</li>
+                            </ul>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                            <h4 className="text-lg font-bold mb-3 text-netcentric-light">📈 Recommendations</h4>
+                            <ul className="space-y-2 text-netcentric-light/90">
+                                <li>• Focus on Analytics templates (highest win rate)</li>
+                                <li>• Add more personalization examples to CDP proposals</li>
+                                <li>• Create industry-specific messaging for Manufacturing</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const SettingsPage = ({ userSettings, updateUserSettings, handleSaveSettings, resetSettingsToDefaults, templates }) => (
+            <div>
+                <h1 className="text-4xl font-bold text-netcentric-dark mb-6">Settings & Configuration</h1>
+                
+                <div className="space-y-8">
+                    {/* User Profile Settings */}
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                        <div className="flex items-center space-x-3 mb-6">
+                            <div className="w-10 h-10 bg-gradient-to-r from-netcentric-blue to-netcentric-purple rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">U</span>
+                            </div>
+                            <h2 className="text-2xl font-bold text-netcentric-dark">User Profile</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Full Name</label>
+                                <input
+                                    key="settings-fullname-input"
+                                    type="text"
+                                    value={userSettings.fullName}
+                                    onChange={(e) => updateUserSettings('fullName', e.target.value)}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Email Address</label>
+                                <input
+                                    key="settings-email-input"
+                                    type="email"
+                                    value={userSettings.email}
+                                    onChange={(e) => updateUserSettings('email', e.target.value)}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Job Title</label>
+                                <input
+                                    key="settings-jobtitle-input"
+                                    type="text"
+                                    value={userSettings.jobTitle}
+                                    onChange={(e) => updateUserSettings('jobTitle', e.target.value)}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Phone Number</label>
+                                <input
+                                    key="settings-phone-input"
+                                    type="tel"
+                                    value={userSettings.phone}
+                                    onChange={(e) => updateUserSettings('phone', e.target.value)}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Company Information */}
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                        <div className="flex items-center space-x-3 mb-6">
+                            <div className="w-10 h-10 bg-gradient-to-r from-netcentric-purple to-netcentric-plum rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">C</span>
+                            </div>
+                            <h2 className="text-2xl font-bold text-netcentric-dark">Company Information</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Company Name</label>
+                                <input
+                                    key="settings-company-input"
+                                    type="text"
+                                    value={userSettings.companyName}
+                                    onChange={(e) => updateUserSettings('companyName', e.target.value)}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Website</label>
+                                <input
+                                    key="settings-website-input"
+                                    type="url"
+                                    value={userSettings.website}
+                                    onChange={(e) => updateUserSettings('website', e.target.value)}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Company Address</label>
+                                <textarea
+                                    key="settings-address-textarea"
+                                    rows="3"
+                                    value={userSettings.companyAddress}
+                                    onChange={(e) => updateUserSettings('companyAddress', e.target.value)}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300 resize-none"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Template Preferences */}
+                        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                            <div className="flex items-center space-x-3 mb-6">
+                                <div className="w-10 h-10 bg-gradient-to-r from-netcentric-plum to-netcentric-midnight rounded-lg flex items-center justify-center">
+                                    <span className="text-white font-bold text-sm">T</span>
+                                </div>
+                                <h2 className="text-xl font-bold text-netcentric-dark">Template Preferences</h2>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-netcentric-dark mb-2">Default Template</label>
+                                    <select 
+                                        key="settings-template-select"
+                                        value={userSettings.defaultTemplate}
+                                        onChange={(e) => updateUserSettings('defaultTemplate', e.target.value)}
+                                        className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                    >
+                                        {templates.map(template => (
+                                            <option key={template.id} value={template.id}>{template.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="flex items-center space-x-3">
+                                        <input 
+                                            key="settings-autopop-checkbox"
+                                            type="checkbox" 
+                                            checked={userSettings.autoPopulateCompany}
+                                            onChange={(e) => updateUserSettings('autoPopulateCompany', e.target.checked)}
+                                            className="w-4 h-4 text-netcentric-blue focus:ring-netcentric-blue border-netcentric-blue/30 rounded" 
+                                        />
+                                        <span className="text-netcentric-dark font-medium">Auto-populate company information</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className="flex items-center space-x-3">
+                                        <input 
+                                            key="settings-casestudies-checkbox"
+                                            type="checkbox" 
+                                            checked={userSettings.includeAdobeCaseStudies}
+                                            onChange={(e) => updateUserSettings('includeAdobeCaseStudies', e.target.checked)}
+                                            className="w-4 h-4 text-netcentric-blue focus:ring-netcentric-blue border-netcentric-blue/30 rounded" 
+                                        />
+                                        <span className="text-netcentric-dark font-medium">Include Adobe case studies by default</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className="flex items-center space-x-3">
+                                        <input 
+                                            key="settings-autogen-checkbox"
+                                            type="checkbox" 
+                                            checked={userSettings.autoGenerateExecutiveSummary}
+                                            onChange={(e) => updateUserSettings('autoGenerateExecutiveSummary', e.target.checked)}
+                                            className="w-4 h-4 text-netcentric-blue focus:ring-netcentric-blue border-netcentric-blue/30 rounded" 
+                                        />
+                                        <span className="text-netcentric-dark font-medium">Auto-generate executive summaries</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Notification Settings */}
+                        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                            <div className="flex items-center space-x-3 mb-6">
+                                <div className="w-10 h-10 bg-gradient-to-r from-netcentric-blue to-netcentric-plum rounded-lg flex items-center justify-center">
+                                    <span className="text-white font-bold text-sm">N</span>
+                                </div>
+                                <h2 className="text-xl font-bold text-netcentric-dark">Notifications</h2>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="flex items-center space-x-3">
+                                        <input 
+                                            key="settings-email-notif-checkbox"
+                                            type="checkbox" 
+                                            checked={userSettings.emailNotifications}
+                                            onChange={(e) => updateUserSettings('emailNotifications', e.target.checked)}
+                                            className="w-4 h-4 text-netcentric-blue focus:ring-netcentric-blue border-netcentric-blue/30 rounded" 
+                                        />
+                                        <span className="text-netcentric-dark font-medium">Email notifications for proposal updates</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className="flex items-center space-x-3">
+                                        <input 
+                                            key="settings-weekly-checkbox"
+                                            type="checkbox" 
+                                            checked={userSettings.weeklyReports}
+                                            onChange={(e) => updateUserSettings('weeklyReports', e.target.checked)}
+                                            className="w-4 h-4 text-netcentric-blue focus:ring-netcentric-blue border-netcentric-blue/30 rounded" 
+                                        />
+                                        <span className="text-netcentric-dark font-medium">Weekly analytics reports</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className="flex items-center space-x-3">
+                                        <input 
+                                            key="settings-browser-checkbox"
+                                            type="checkbox" 
+                                            checked={userSettings.browserNotifications}
+                                            onChange={(e) => updateUserSettings('browserNotifications', e.target.checked)}
+                                            className="w-4 h-4 text-netcentric-blue focus:ring-netcentric-blue border-netcentric-blue/30 rounded" 
+                                        />
+                                        <span className="text-netcentric-dark font-medium">Browser push notifications</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className="flex items-center space-x-3">
+                                        <input 
+                                            key="settings-deadline-checkbox"
+                                            type="checkbox" 
+                                            checked={userSettings.deadlineReminders}
+                                            onChange={(e) => updateUserSettings('deadlineReminders', e.target.checked)}
+                                            className="w-4 h-4 text-netcentric-blue focus:ring-netcentric-blue border-netcentric-blue/30 rounded" 
+                                        />
+                                        <span className="text-netcentric-dark font-medium">Proposal deadline reminders</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Export & Integration Settings */}
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-netcentric-blue/10 p-8">
+                        <div className="flex items-center space-x-3 mb-6">
+                            <div className="w-10 h-10 bg-gradient-to-r from-netcentric-purple to-netcentric-blue rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">E</span>
+                            </div>
+                            <h2 className="text-2xl font-bold text-netcentric-dark">Export & Integration Settings</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">Default Export Format</label>
+                                <select 
+                                    key="settings-export-select"
+                                    value={userSettings.defaultExportFormat}
+                                    onChange={(e) => updateUserSettings('defaultExportFormat', e.target.value)}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                >
+                                    <option value="pdf">PDF Document</option>
+                                    <option value="powerpoint">PowerPoint Presentation</option>
+                                    <option value="word">Word Document</option>
+                                    <option value="html">HTML Page</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-netcentric-dark mb-2">PDF Quality</label>
+                                <select 
+                                    key="settings-quality-select"
+                                    value={userSettings.pdfQuality}
+                                    onChange={(e) => updateUserSettings('pdfQuality', e.target.value)}
+                                    className="w-full border-2 border-netcentric-blue/20 rounded-xl px-4 py-3 focus:border-netcentric-blue focus:ring-2 focus:ring-netcentric-blue/20 transition-all duration-300"
+                                >
+                                    <option value="high">High Quality (Recommended)</option>
+                                    <option value="medium">Medium Quality</option>
+                                    <option value="low">Low Quality (Faster)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="flex items-center space-x-3">
+                                    <input 
+                                        key="settings-watermark-checkbox"
+                                        type="checkbox" 
+                                        checked={userSettings.includeWatermark}
+                                        onChange={(e) => updateUserSettings('includeWatermark', e.target.checked)}
+                                        className="w-4 h-4 text-netcentric-blue focus:ring-netcentric-blue border-netcentric-blue/30 rounded" 
+                                    />
+                                    <span className="text-netcentric-dark font-medium">Include company watermark</span>
+                                </label>
+                            </div>
+                            <div>
+                                <label className="flex items-center space-x-3">
+                                    <input 
+                                        key="settings-cloud-checkbox"
+                                        type="checkbox" 
+                                        checked={userSettings.autoSaveToCloud}
+                                        onChange={(e) => updateUserSettings('autoSaveToCloud', e.target.checked)}
+                                        className="w-4 h-4 text-netcentric-blue focus:ring-netcentric-blue border-netcentric-blue/30 rounded" 
+                                    />
+                                    <span className="text-netcentric-dark font-medium">Auto-save to cloud storage</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Security & Privacy */}
+                    <div className="bg-gradient-to-br from-netcentric-midnight to-netcentric-dark rounded-3xl text-white p-8 shadow-2xl">
+                        <div className="flex items-center space-x-3 mb-6">
+                            <div className="w-10 h-10 bg-white/20 backdrop-blur-lg rounded-lg flex items-center justify-center border border-white/30">
+                                <span className="text-white font-bold text-sm">S</span>
+                            </div>
+                            <h2 className="text-2xl font-bold">Security & Privacy</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                                <h3 className="text-lg font-bold mb-4 text-netcentric-light">Account Security</h3>
+                                <div className="space-y-3">
+                                    <button className="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 text-left">
+                                        Change Password
+                                    </button>
+                                    <button className="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 text-left">
+                                        Enable Two-Factor Authentication
+                                    </button>
+                                    <button className="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 text-left">
+                                        View Login History
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                                <h3 className="text-lg font-bold mb-4 text-netcentric-light">Data Management</h3>
+                                <div className="space-y-3">
+                                    <button className="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 text-left">
+                                        Export All Data
+                                    </button>
+                                    <button className="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 text-left">
+                                        Privacy Settings
+                                    </button>
+                                    <button className="w-full bg-red-500/30 hover:bg-red-500/50 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 text-left">
+                                        Delete Account
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Save Button */}
+                    <div className="flex justify-end space-x-4">
+                        <button 
+                            onClick={resetSettingsToDefaults}
+                            className="bg-netcentric-gray/20 text-netcentric-dark px-8 py-3 rounded-xl font-semibold hover:bg-netcentric-gray/30 transition-all duration-300"
+                        >
+                            Reset to Defaults
+                        </button>
+                        <button 
+                            onClick={handleSaveSettings}
+                            className="bg-gradient-to-r from-netcentric-blue to-netcentric-purple text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
+                        >
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const SmartProposalApp = () => {
+            // State management
+            const [currentPage, setCurrentPage] = useState('home');
+            const [selectedTemplate, setSelectedTemplate] = useState('');
+            const [isPreviewMode, setIsPreviewMode] = useState(false);
+            const [lastSaved, setLastSaved] = useState(null);
+            
+            // Comprehensive proposal data state
+            const [proposalData, setProposalData] = useState({
+                customerContext: {
+                    customerName: '',
+                    industry: '',
+                    companySize: '',
+                    geography: '',
+                    challenges: '',
+                    techStack: '',
+                    priorities: '',
+                    stakeholders: ''
+                },
+                opportunityDetails: {
+                    opportunityName: '',
+                    opportunityType: '',
+                    salesStage: '',
+                    budget: '',
+                    timeline: '',
+                    decisionCriteria: []
+                },
+                proposedSolution: {
+                    overview: '',
+                    services: [],
+                    useCases: '',
+                    outcomes: '',
+                    differentiators: ''
+                },
+                teamDelivery: {
+                    deliveryModel: '',
+                    timelineEstimate: '',
+                    teamMembers: '',
+                    partners: ''
+                },
+                commercials: {
+                    pricing: '',
+                    scope: '',
+                    assumptions: '',
+                    nextSteps: ''
+                },
+                extras: {
+                    tone: '',
+                    format: '',
+                    internalOwner: '',
+                    attachments: []
+                }
+            });
+
+            // RFP-related state
+            const [rfpData, setRfpData] = useState({
+                uploadedFile: null,
+                fileName: '',
+                fileContent: '',
+                analysis: {
+                    executiveSummary: '',
+                    keyRequirements: [],
+                    timeline: '',
+                    evaluationCriteria: [],
+                    submissionFormat: '',
+                    stakeholders: []
+                },
+                isAnalyzing: false,
+                analysisComplete: false
+            });
+
+            const [generatedProposal, setGeneratedProposal] = useState({
+                coverLetter: '',
+                solutionOverview: '',
+                teamStructure: '',
+                deliveryTimeline: '',
+                assumptions: '',
+                suggestedCaseStudies: [],
+                isGenerating: false,
+                generationComplete: false
+            });
+
+            // RFP Library state for managing multiple saved RFPs
+            const [rfpLibrary, setRfpLibrary] = useState([]);
+            const [currentRfpId, setCurrentRfpId] = useState(null);
+
+            // Dynamic sections state
+            const [sections, setSections] = useState([{
+                id: Date.now(),
+                title: 'Project Scope',
+                content: 'Define the project scope and objectives here...'
+            }]);
+
+            // Settings state
+            const [userSettings, setUserSettings] = useState({
+                // User Profile
+                fullName: 'John Smith',
+                email: 'john.smith@netcentric.biz',
+                jobTitle: 'Senior Adobe Solutions Consultant',
+                phone: '+31 20 530 2000',
+                // Company Information
+                companyName: 'Cognizant Netcentric',
+                website: 'www.netcentric.biz',
+                companyAddress: 'Europaplein 2-6\n1078 GZ Amsterdam\nNetherlands',
+                // Template Preferences
+                defaultTemplate: 'aem-implementation',
+                autoPopulateCompany: true,
+                includeAdobeCaseStudies: true,
+                autoGenerateExecutiveSummary: false,
+                // Notifications
+                emailNotifications: true,
+                weeklyReports: true,
+                browserNotifications: false,
+                deadlineReminders: true,
+                // Export Settings
+                defaultExportFormat: 'pdf',
+                pdfQuality: 'high',
+                includeWatermark: true,
+                autoSaveToCloud: true
+            });
+
+            // Load settings and RFP library from localStorage on component mount
+            useEffect(() => {
+                try {
+                    const savedSettings = localStorage.getItem('smartProposalSettings');
+                    if (savedSettings) {
+                        const parsedSettings = JSON.parse(savedSettings);
+                        setUserSettings(parsedSettings);
+                        console.log('Settings loaded from localStorage');
+                    }
+                } catch (error) {
+                    console.error('Failed to load settings from localStorage:', error);
+                    // Keep default settings if loading fails
+                }
+
+                // Load RFP library
+                try {
+                    const savedRfpLibrary = localStorage.getItem('smartProposalRfpLibrary');
+                    if (savedRfpLibrary) {
+                        const parsedLibrary = JSON.parse(savedRfpLibrary);
+                        setRfpLibrary(parsedLibrary);
+                        console.log('RFP library loaded from localStorage');
+                    }
+                } catch (error) {
+                    console.error('Failed to load RFP library from localStorage:', error);
+                }
+            }, []);
+
+            // Template options
+            const templates = [
+                {
+                    id: 'aem-implementation',
+                    name: 'AEM Implementation Proposal',
+                    icon: '🏗️',
+                    description: 'Complete AEM platform setup with technical architecture and migration strategy.'
+                },
+                {
+                    id: 'digital-strategy',
+                    name: 'Digital Strategy & Discovery',
+                    icon: '🎯',
+                    description: 'Strategic digital transformation roadmap with comprehensive discovery phase.'
+                },
+                {
+                    id: 'analytics-optimization',
+                    name: 'Adobe Analytics Optimization',
+                    icon: '📊',
+                    description: 'Analytics implementation and optimization for improved data insights.'
+                },
+                {
+                    id: 'cdp-personalization',
+                    name: 'CDP & Personalization Pitch',
+                    icon: '🎨',
+                    description: 'Customer Data Platform setup with advanced personalization capabilities.'
+                },
+                {
+                    id: 'managed-services',
+                    name: 'Managed Services Agreement',
+                    icon: '🛠️',
+                    description: 'Ongoing support and maintenance services with defined SLAs.'
+                },
+                {
+                    id: 'marketing-automation',
+                    name: 'Marketing Automation Proposal',
+                    icon: '⚡',
+                    description: 'Marketing automation strategy with campaign management and lead nurturing.'
+                },
+                {
+                    id: 'custom',
+                    name: 'Custom Proposal',
+                    icon: '🎨',
+                    description: 'Flexible template for unique projects and specialized requirements.'
+                }
+            ];
+
+            // Company information
+            const companyInfo = {
+                name: 'Cognizant Netcentric',
+                tagline: 'Your trusted advisor for Adobe-powered customer experiences',
+                address: 'Europaplein 2-6\n1078 GZ Amsterdam\nNetherlands',
+                phone: '+31 20 530 2000',
+                email: 'info@netcentric.biz',
+                website: 'www.netcentric.biz',
+                description: 'We design and build scalable Adobe solutions that empower brands to connect with their customers through business-critical digital experiences.',
+                colors: {
+                    primary: '#1e40af',
+                    secondary: '#7c3aed', 
+                    accent: '#6b21a8',
+                    text: '#1e293b',
+                    lightText: '#64748b',
+                    background: '#f1f5f9'
+                }
+            };
+
+            // Sample proposals
+            const sampleProposals = [
+                { id: 1, title: 'Adobe Experience Cloud Implementation - RetailCorp', client: 'RetailCorp', status: 'Draft', template: 'AEM Implementation', value: '$125,000' },
+                { id: 2, title: 'Digital Analytics Optimization - TechStart', client: 'TechStart', status: 'Sent', template: 'Adobe Analytics', value: '$45,000' },
+                { id: 3, title: 'CDP Strategy & Implementation - FinanceFirst', client: 'FinanceFirst', status: 'Under Review', template: 'CDP & Personalization', value: '$200,000' }
+            ];
+
+            // Navigation function
+            const handleNavigate = (page) => {
+                setCurrentPage(page);
+                if (page !== 'create') {
+                    setIsPreviewMode(false);
+                }
+            };
+
+            // Save and export functions
+            const handleSaveDraft = () => {
+                setLastSaved(new Date());
+                alert('Proposal draft saved successfully!');
+            };
+
+            // Settings functions
+            const updateUserSettings = (field, value) => {
+                setUserSettings(prev => ({
+                    ...prev,
+                    [field]: value
+                }));
+            };
+
+            const handleSaveSettings = () => {
+                try {
+                    // Save settings to localStorage for persistence
+                    localStorage.setItem('smartProposalSettings', JSON.stringify(userSettings));
+                    setLastSaved(new Date());
+                    alert('Settings saved successfully! Your changes will persist across sessions.');
+                } catch (error) {
+                    console.error('Failed to save settings:', error);
+                    alert('Failed to save settings. Please try again.');
+                }
+            };
+
+            const resetSettingsToDefaults = () => {
+                const defaultSettings = {
+                    // User Profile
+                    fullName: 'John Smith',
+                    email: 'john.smith@netcentric.biz',
+                    jobTitle: 'Senior Adobe Solutions Consultant',
+                    phone: '+31 20 530 2000',
+                    // Company Information
+                    companyName: 'Cognizant Netcentric',
+                    website: 'www.netcentric.biz',
+                    companyAddress: 'Europaplein 2-6\n1078 GZ Amsterdam\nNetherlands',
+                    // Template Preferences
+                    defaultTemplate: 'aem-implementation',
+                    autoPopulateCompany: true,
+                    includeAdobeCaseStudies: true,
+                    autoGenerateExecutiveSummary: false,
+                    // Notifications
+                    emailNotifications: true,
+                    weeklyReports: true,
+                    browserNotifications: false,
+                    deadlineReminders: true,
+                    // Export Settings
+                    defaultExportFormat: 'pdf',
+                    pdfQuality: 'high',
+                    includeWatermark: true,
+                    autoSaveToCloud: true
+                };
+                
+                setUserSettings(defaultSettings);
+                
+                // Also save the defaults to localStorage
+                try {
+                    localStorage.setItem('smartProposalSettings', JSON.stringify(defaultSettings));
+                    alert('Settings reset to defaults and saved successfully!');
+                } catch (error) {
+                    console.error('Failed to save default settings:', error);
+                    alert('Settings reset to defaults, but failed to save. Please save manually.');
+                }
+            };
+
+            // Executive Summary Auto-Generator
+            const generateExecutiveSummary = () => {
+                const clientName = proposalData.customerContext.customerName || 'our valued client';
+                const opportunityName = proposalData.opportunityDetails.opportunityName || 'this project';
+                const selectedTemplateObj = templates.find(t => t.id === selectedTemplate);
+                
+                let projectType = 'digital transformation';
+                let solution = 'scalable Adobe solutions';
+                let painPoints = 'operational efficiency and customer experience';
+                
+                if (selectedTemplateObj) {
+                    switch (selectedTemplateObj.id) {
+                        case 'aem-implementation':
+                            projectType = 'Adobe Experience Manager implementation';
+                            solution = 'comprehensive AEM platform setup with technical architecture and migration strategy';
+                            painPoints = 'content management complexity and digital experience delivery';
+                            break;
+                        case 'digital-strategy':
+                            projectType = 'digital strategy and discovery initiative';
+                            solution = 'strategic digital transformation roadmap with comprehensive discovery methodology';
+                            painPoints = 'digital maturity gaps and strategic direction clarity';
+                            break;
+                        case 'analytics-optimization':
+                            projectType = 'Adobe Analytics optimization';
+                            solution = 'advanced analytics implementation and optimization for improved data insights';
+                            painPoints = 'data visibility limitations and performance measurement challenges';
+                            break;
+                        case 'cdp-personalization':
+                            projectType = 'Customer Data Platform and personalization initiative';
+                            solution = 'integrated CDP setup with advanced personalization capabilities';
+                            painPoints = 'customer data fragmentation and personalization scalability';
+                            break;
+                        case 'managed-services':
+                            projectType = 'managed services agreement';
+                            solution = 'ongoing support and maintenance services with defined SLAs';
+                            painPoints = 'operational overhead and technical resource constraints';
+                            break;
+                        case 'marketing-automation':
+                            projectType = 'marketing automation implementation';
+                            solution = 'comprehensive marketing automation strategy with campaign management and lead nurturing';
+                            painPoints = 'manual marketing processes and lead management inefficiencies';
+                            break;
+                        default:
+                            projectType = 'custom digital solution';
+                            solution = 'tailored Adobe-powered solution designed for unique business requirements';
+                    }
+                }
+                
+                const executiveSummary = `Cognizant Netcentric proposes to partner with ${clientName} on ${opportunityName}, a strategic ${projectType} designed to address critical ${painPoints}. In today's competitive digital landscape, organizations require innovative solutions that drive measurable business outcomes while ensuring scalability and operational excellence. Our comprehensive approach delivers ${solution}, leveraging our proven expertise as Adobe's trusted partner and our deep understanding of enterprise-grade digital experiences. This initiative will position ${clientName} for sustained growth while optimizing technology investments and enhancing competitive advantage in the digital marketplace.`;
+                
+                setProposalData(prev => ({
+                    ...prev,
+                    proposedSolution: {
+                        ...prev.proposedSolution,
+                        overview: executiveSummary
+                    }
+                }));
+                
+                alert('Executive Summary generated successfully! You can edit it further if needed.');
+            };
+
+            // RFP Upload and Analysis Functions
+            const handleFileUpload = (file) => {
+                setRfpData(prev => ({
+                    ...prev,
+                    uploadedFile: file,
+                    fileName: file.name,
+                    isAnalyzing: false,
+                    analysisComplete: false
+                }));
+                
+                // Simulate file reading
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    setRfpData(prev => ({
+                        ...prev,
+                        fileContent: e.target.result
+                    }));
+                };
+                reader.readAsText(file);
+                
+                alert(`File "${file.name}" uploaded successfully! Click "Analyze RFP" to process it.`);
+            };
+
+            const analyzeRFP = () => {
+                if (!rfpData.uploadedFile) {
+                    alert('Please upload an RFP file first.');
+                    return;
+                }
+
+                setRfpData(prev => ({ ...prev, isAnalyzing: true }));
+
+                // Simulate AI analysis with realistic delay
+                setTimeout(() => {
+                    // Mock AI analysis results
+                    const mockAnalysis = {
+                        executiveSummary: `This RFP seeks proposals for a comprehensive digital transformation initiative focusing on customer experience enhancement and operational efficiency. The project involves implementing modern digital solutions to streamline business processes and improve customer engagement across multiple touchpoints.`,
+                        
+                        keyRequirements: [
+                            'Customer Experience Platform implementation',
+                            'Marketing automation and personalization',
+                            'Data integration and analytics capabilities',
+                            'Mobile-first responsive design',
+                            'Multi-channel content management',
+                            'Performance monitoring and optimization',
+                            'Security and compliance adherence',
+                            'Staff training and change management'
+                        ],
+                        
+                        timeline: 'Project duration: 6-9 months with key milestones at 30, 60, and 90 days. Go-live target: Q3 2024. Post-implementation support for 12 months.',
+                        
+                        evaluationCriteria: [
+                            'Technical expertise and solution fit (30%)',
+                            'Cost and value proposition (25%)',
+                            'Implementation timeline and approach (20%)',
+                            'Team qualifications and references (15%)',
+                            'Post-implementation support (10%)'
+                        ],
+                        
+                        submissionFormat: 'Electronic submission via client portal. Maximum 50 pages including executive summary, technical approach, team bios, timeline, and pricing. Due date: 30 days from RFP issuance.',
+                        
+                        stakeholders: [
+                            'Chief Digital Officer (Decision Maker)',
+                            'IT Director (Technical Evaluator)', 
+                            'Marketing Director (Business Stakeholder)',
+                            'Procurement Manager (Commercial Evaluator)',
+                            'Legal Counsel (Contract Review)'
+                        ]
+                    };
+
+                    setRfpData(prev => ({
+                        ...prev,
+                        analysis: mockAnalysis,
+                        isAnalyzing: false,
+                        analysisComplete: true
+                    }));
+
+                    alert('RFP Analysis completed! Review the extracted information and generate your proposal.');
+                }, 3000);
+            };
+
+            const generateProposalFromRFP = () => {
+                if (!rfpData.analysisComplete) {
+                    alert('Please analyze the RFP first.');
+                    return;
+                }
+
+                setGeneratedProposal(prev => ({ ...prev, isGenerating: true }));
+
+                // Simulate AI proposal generation
+                setTimeout(() => {
+                    const mockProposal = {
+                        coverLetter: `Dear Selection Committee,
+
+Cognizant Netcentric is pleased to submit our proposal for your digital transformation initiative. As Adobe's premier partner with over 15 years of experience delivering enterprise-scale digital solutions, we understand the critical importance of creating exceptional customer experiences while driving operational efficiency.
+
+Our proven methodology, combined with deep technical expertise and industry-specific knowledge, positions us uniquely to deliver the comprehensive solution outlined in your RFP. We are committed to not only meeting your technical requirements but exceeding your expectations for innovation, quality, and partnership.
+
+We look forward to the opportunity to discuss how our solution can accelerate your digital transformation journey and deliver measurable business value.
+
+Sincerely,
+The Cognizant Netcentric Team`,
+
+                        solutionOverview: `Our proposed solution leverages Adobe Experience Cloud to create a unified, scalable platform that addresses all key requirements:
+
+• **Adobe Experience Platform (AEP)**: Centralized customer data platform for real-time insights and personalization
+• **Adobe Experience Manager (AEM)**: Robust content management with multi-channel delivery capabilities  
+• **Adobe Target**: AI-powered personalization and testing framework
+• **Adobe Analytics**: Comprehensive performance monitoring and optimization tools
+• **Adobe Campaign**: Advanced marketing automation and customer journey orchestration
+
+This integrated approach ensures seamless data flow, consistent customer experiences, and measurable business outcomes while maintaining security and compliance standards.`,
+
+                        teamStructure: `**Project Leadership:**
+• Sarah Johnson - Project Director (15+ years Adobe implementations)
+• Michael Chen - Technical Architect (Adobe Certified Expert)
+• Lisa Rodriguez - UX/CX Lead (Digital transformation specialist)
+
+**Core Implementation Team:**
+• 2 Senior Adobe Developers
+• 1 Frontend/Mobile Specialist  
+• 1 Data Integration Expert
+• 1 QA/Testing Lead
+• 1 Change Management Consultant
+
+**Support Team:**
+• DevOps Engineer
+• Security Specialist
+• Training Coordinator
+
+Total team size: 11 professionals with an average of 8+ years Adobe experience.`,
+
+                        deliveryTimeline: `**Phase 1 (Months 1-2): Foundation & Setup**
+• Requirements finalization and technical design
+• Environment setup and integrations planning
+• Content strategy and information architecture
+
+**Phase 2 (Months 3-4): Core Development**  
+• AEM implementation and content migration
+• AEP configuration and data integration
+• Initial personalization setup
+
+**Phase 3 (Months 5-6): Advanced Features**
+• Marketing automation configuration
+• Advanced analytics implementation
+• Mobile optimization and testing
+
+**Phase 4 (Months 7-8): Testing & Launch**
+• User acceptance testing and bug fixes
+• Performance optimization and security audit
+• Soft launch and feedback incorporation
+
+**Phase 5 (Month 9): Go-Live & Support**
+• Production launch and monitoring
+• Staff training and knowledge transfer
+• Post-launch optimization and support`,
+
+                        assumptions: `• Client will provide timely access to existing systems and data
+• Subject matter experts will be available for requirements clarification
+• Necessary hardware/infrastructure will be provisioned as specified
+• Third-party integrations APIs will be stable and documented
+• Client approval cycles will not exceed 5 business days
+• Change requests will follow agreed change management process
+• All licensing agreements will be finalized before implementation begins`,
+
+                        suggestedCaseStudies: [
+                            'Global Retail Chain - 40% increase in online conversion rates',
+                            'Financial Services Firm - 60% reduction in content publishing time', 
+                            'Healthcare Provider - 300% improvement in patient engagement metrics',
+                            'Manufacturing Leader - $2M annual savings through process automation'
+                        ],
+
+                        isGenerating: false,
+                        generationComplete: true
+                    };
+
+                    setGeneratedProposal(mockProposal);
+                    alert('Proposal generated successfully! Review and customize the content as needed.');
+                }, 4000);
+            };
+
+            // RFP Library Management Functions
+            const saveCurrentRFP = () => {
+                if (!rfpData.fileName) {
+                    alert('No RFP file to save. Please upload an RFP first.');
+                    return;
+                }
+
+                const rfpId = currentRfpId || Date.now().toString();
+                const rfpToSave = {
+                    id: rfpId,
+                    fileName: rfpData.fileName,
+                    fileContent: rfpData.fileContent,
+                    analysis: rfpData.analysis,
+                    analysisComplete: rfpData.analysisComplete,
+                    generatedProposal: generatedProposal.generationComplete ? generatedProposal : null,
+                    savedAt: new Date().toISOString(),
+                    lastModified: new Date().toISOString()
+                };
+
+                try {
+                    const updatedLibrary = rfpLibrary.filter(rfp => rfp.id !== rfpId);
+                    updatedLibrary.push(rfpToSave);
+                    
+                    setRfpLibrary(updatedLibrary);
+                    setCurrentRfpId(rfpId);
+                    
+                    localStorage.setItem('smartProposalRfpLibrary', JSON.stringify(updatedLibrary));
+                    alert(`RFP "${rfpData.fileName}" saved successfully!`);
+                } catch (error) {
+                    console.error('Failed to save RFP:', error);
+                    alert('Failed to save RFP. Please try again.');
+                }
+            };
+
+            const loadRFP = (rfpId) => {
+                const rfpToLoad = rfpLibrary.find(rfp => rfp.id === rfpId);
+                if (!rfpToLoad) {
+                    alert('RFP not found.');
+                    return;
+                }
+
+                setRfpData({
+                    uploadedFile: null, // Can't restore the actual file object
+                    fileName: rfpToLoad.fileName,
+                    fileContent: rfpToLoad.fileContent,
+                    analysis: rfpToLoad.analysis,
+                    isAnalyzing: false,
+                    analysisComplete: rfpToLoad.analysisComplete
+                });
+
+                if (rfpToLoad.generatedProposal) {
+                    setGeneratedProposal(rfpToLoad.generatedProposal);
+                } else {
+                    setGeneratedProposal({
+                        coverLetter: '',
+                        solutionOverview: '',
+                        teamStructure: '',
+                        deliveryTimeline: '',
+                        assumptions: '',
+                        suggestedCaseStudies: [],
+                        isGenerating: false,
+                        generationComplete: false
+                    });
+                }
+
+                setCurrentRfpId(rfpId);
+                alert(`RFP "${rfpToLoad.fileName}" loaded successfully!`);
+            };
+
+            const deleteRFP = (rfpId) => {
+                if (!confirm('Are you sure you want to delete this RFP? This action cannot be undone.')) {
+                    return;
+                }
+
+                try {
+                    const updatedLibrary = rfpLibrary.filter(rfp => rfp.id !== rfpId);
+                    setRfpLibrary(updatedLibrary);
+                    localStorage.setItem('smartProposalRfpLibrary', JSON.stringify(updatedLibrary));
+                    
+                    if (currentRfpId === rfpId) {
+                        setCurrentRfpId(null);
+                        // Reset current RFP data if the deleted RFP was currently loaded
+                        setRfpData({
+                            uploadedFile: null,
+                            fileName: '',
+                            fileContent: '',
+                            analysis: {
+                                executiveSummary: '',
+                                keyRequirements: [],
+                                timeline: '',
+                                evaluationCriteria: [],
+                                submissionFormat: '',
+                                stakeholders: []
+                            },
+                            isAnalyzing: false,
+                            analysisComplete: false
+                        });
+                        setGeneratedProposal({
+                            coverLetter: '',
+                            solutionOverview: '',
+                            teamStructure: '',
+                            deliveryTimeline: '',
+                            assumptions: '',
+                            suggestedCaseStudies: [],
+                            isGenerating: false,
+                            generationComplete: false
+                        });
+                    }
+                    
+                    alert('RFP deleted successfully!');
+                } catch (error) {
+                    console.error('Failed to delete RFP:', error);
+                    alert('Failed to delete RFP. Please try again.');
+                }
+            };
+
+            const createNewRFP = () => {
+                setCurrentRfpId(null);
+                setRfpData({
+                    uploadedFile: null,
+                    fileName: '',
+                    fileContent: '',
+                    analysis: {
+                        executiveSummary: '',
+                        keyRequirements: [],
+                        timeline: '',
+                        evaluationCriteria: [],
+                        submissionFormat: '',
+                        stakeholders: []
+                    },
+                    isAnalyzing: false,
+                    analysisComplete: false
+                });
+                setGeneratedProposal({
+                    coverLetter: '',
+                    solutionOverview: '',
+                    teamStructure: '',
+                    deliveryTimeline: '',
+                    assumptions: '',
+                    suggestedCaseStudies: [],
+                    isGenerating: false,
+                    generationComplete: false
+                });
+            };
+
+            // PDF Export Function - GUARANTEED WORKING VERSION
+            const handleDownloadPDF = () => {
+                console.log('=== PDF Generation Started ===');
+                console.log('proposalData:', proposalData);
+                console.log('generatedProposal:', generatedProposal);
+                console.log('userSettings:', userSettings);
+                
+                try {
+                    // Step 1: Check jsPDF library
+                    console.log('Step 1: Checking jsPDF library...');
+                    if (!window.jspdf) {
+                        console.error('❌ window.jspdf is undefined');
+                        alert('❌ PDF library failed to load. Please refresh the page and try again.');
+                        return;
+                    }
+                    
+                    if (!window.jspdf.jsPDF) {
+                        console.error('❌ window.jspdf.jsPDF is undefined');
+                        alert('❌ PDF constructor not available. Please refresh the page and try again.');
+                        return;
+                    }
+                    console.log('✅ jsPDF library loaded successfully');
+                    
+                    // Step 2: Initialize PDF document
+                    console.log('Step 2: Creating PDF document...');
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    console.log('✅ PDF document created');
+                    
+                    // Step 3: Prepare data with fallbacks
+                    console.log('Step 3: Preparing data...');
+                    let proposalTitle = 'Business Proposal';
+                    let clientName = 'Valued Client';
+                    let executiveSummary = 'Thank you for your interest in our services. This proposal outlines our recommended approach for your project.';
+                    
+                    // Try to get data from proposalData
+                    if (proposalData && typeof proposalData === 'object') {
+                        console.log('✅ proposalData found, extracting values...');
+                        if (proposalData.opportunityDetails?.opportunityName) {
+                            proposalTitle = proposalData.opportunityDetails.opportunityName;
+                        } else if (proposalData.customerContext?.customerName) {
+                            proposalTitle = proposalData.customerContext.customerName + ' Proposal';
+                        }
+                        
+                        if (proposalData.customerContext?.customerName) {
+                            clientName = proposalData.customerContext.customerName;
+                        }
+                        
+                        if (proposalData.proposedSolution?.overview) {
+                            executiveSummary = proposalData.proposedSolution.overview;
+                        }
+                    }
+                    
+                    // Try to get data from generatedProposal
+                    if (generatedProposal && typeof generatedProposal === 'object') {
+                        console.log('✅ generatedProposal found, checking for content...');
+                        if (generatedProposal.coverLetter) {
+                            executiveSummary = generatedProposal.coverLetter;
+                        }
+                    }
+                    
+                    const currentDate = new Date().toLocaleDateString();
+                    const generatedBy = (userSettings?.fullName) || 'Cognizant Netcentric Team';
+                    
+                    console.log('Data prepared:', { proposalTitle, clientName, currentDate, generatedBy });
+                    console.log('Executive summary length:', executiveSummary.length);
+                    
+                    // Step 4: Generate PDF content
+                    console.log('Step 4: Adding content to PDF...');
+                    let yPos = 20;
+                    
+                    // Title
+                    console.log('Adding title...');
+                    doc.setFontSize(18);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(proposalTitle, 20, yPos);
+                    yPos += 25;
+                    
+                    // Client info
+                    console.log('Adding client info...');
+                    doc.setFontSize(12);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text('Prepared for: ' + clientName, 20, yPos);
+                    yPos += 10;
+                    doc.text('Date: ' + currentDate, 20, yPos);
+                    yPos += 10;
+                    doc.text('Generated by: ' + generatedBy, 20, yPos);
+                    yPos += 20;
+                    
+                    // Executive Summary
+                    console.log('Adding executive summary...');
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('Executive Summary', 20, yPos);
+                    yPos += 15;
+                    
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'normal');
+                    
+                    // Ensure executiveSummary is a string and split it properly
+                    const summaryText = String(executiveSummary || 'No executive summary available.');
+                    const textLines = doc.splitTextToSize(summaryText, 170);
+                    console.log('Text split into', textLines.length, 'lines');
+                    
+                    // Add text lines with proper spacing
+                    textLines.forEach((line, index) => {
+                        if (yPos > 250) { // Check if we need a new page
+                            doc.addPage();
+                            yPos = 20;
+                        }
+                        doc.text(line, 20, yPos);
+                        yPos += 5;
+                    });
+                    
+                    // Step 5: Generate filename and save
+                    console.log('Step 5: Saving PDF...');
+                    const cleanTitle = proposalTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+                    const cleanClient = clientName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+                    const timestamp = new Date().toISOString().split('T')[0];
+                    const filename = `${cleanTitle}_${cleanClient}_${timestamp}.pdf`;
+                    
+                    console.log('Generated filename:', filename);
+                    
+                    // Save PDF
+                    doc.save(filename);
+                    console.log('✅ PDF saved successfully!');
+                    
+                    // Success message
+                    alert(`✅ PDF generated successfully!\nFile: ${filename}\n\nThe PDF should start downloading now.`);
+                    
+                } catch (error) {
+                    console.error('❌ PDF generation error:', error);
+                    console.error('Error stack:', error.stack);
+                    console.error('Error details:', {
+                        message: error.message,
+                        name: error.name,
+                        stack: error.stack
+                    });
+                    
+                    // More detailed error message
+                    let errorMessage = `❌ PDF Generation Failed!\n\nError: ${error.message}\n\nPlease:\n1. Refresh the page\n2. Fill out some proposal data\n3. Try again\n\nIf the problem persists, check the browser console for details.`;
+                    alert(errorMessage);
+                }
+            };
+            // PowerPoint Export Function - Professional Business Layout
+            const handleDownloadPowerPoint = () => {
+                try {
+                    const pptx = new PptxGenJS();
+                    
+                    // Get proposal data safely
+                    const proposalTitle = proposalData?.opportunityDetails?.opportunityName || 
+                                        proposalData?.customerContext?.customerName + ' Proposal' || 
+                                        'Business Proposal';
+                    const clientName = proposalData?.customerContext?.customerName || 'Valued Client';
+                    const currentDate = new Date().toLocaleDateString();
+                    const generatedBy = userSettings?.fullName || 'Cognizant Netcentric Team';
+                    
+                    // Create title slide
+                    const titleSlide = pptx.addSlide();
+                    titleSlide.addText(proposalTitle, {
+                        x: 1, y: 2, w: 8, h: 1.5,
+                        fontSize: 24, bold: true, color: '1E40AF'
+                    });
+                    titleSlide.addText('Prepared for: ' + clientName, {
+                        x: 1, y: 3.5, w: 8, h: 0.8,
+                        fontSize: 16
+                    });
+                    titleSlide.addText('Generated by: ' + generatedBy, {
+                        x: 1, y: 4.3, w: 8, h: 0.6,
+                        fontSize: 12
+                    });
+                    titleSlide.addText('Date: ' + currentDate, {
+                        x: 1, y: 4.9, w: 8, h: 0.6,
+                        fontSize: 12
+                    });
+                    
+                    // Add content slide if available
+                    const executiveSummary = proposalData?.proposedSolution?.overview || 
+                                           generatedProposal?.coverLetter || 
+                                           'Executive summary content will appear here.';
+                    
+                    const contentSlide = pptx.addSlide();
+                    contentSlide.addText('Executive Summary', {
+                        x: 0.5, y: 0.5, w: 9, h: 0.8,
+                        fontSize: 20, bold: true, color: '1E40AF'
+                    });
+                    contentSlide.addText(executiveSummary, {
+                        x: 0.5, y: 1.5, w: 9, h: 4,
+                        fontSize: 14, wrap: true
+                    });
+                    
+                    // Generate filename
+                    const cleanTitle = proposalTitle.replace(/[^a-zA-Z0-9]/g, '_');
+                    const cleanClient = clientName.replace(/[^a-zA-Z0-9]/g, '_');
+                    const filename = `${cleanTitle}_${cleanClient}_${new Date().toISOString().split('T')[0]}.pptx`;
+                    
+                    // Save PowerPoint
+                    pptx.writeFile({ fileName: filename });
+                    alert('PowerPoint generated successfully!');
+                    
+                } catch (error) {
+                    console.error('PowerPoint generation error:', error);
+                    alert('Error generating PowerPoint: ' + error.message);
+                }
+            };
+
+            // Complex PDF Export Function - Professional Multi-page Layout
+            const handleDownloadComplexPDF = () => {
+                try {
+                    // Check if jsPDF library is loaded
+                    if (!window.jspdf || !window.jspdf.jsPDF) {
+                        alert('PDF library not available. Please refresh the page.');
+                        return;
+                    }
+                    
+                    // Validate that we have minimum required data
+                    if (!proposalData || typeof proposalData !== 'object') {
+                        alert('No proposal data available. Please fill out the proposal form first.');
+                        console.error('proposalData is not available or invalid:', proposalData);
+                        return;
+                    }
+
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    
+                    // Get proposal data safely
+                    const proposalTitle = proposalData?.opportunityDetails?.opportunityName || 
+                                        (proposalData?.customerContext?.customerName ? proposalData.customerContext.customerName + ' Proposal' : null) || 
+                                        'Business Proposal';
+                    const clientName = proposalData?.customerContext?.customerName || 'Valued Client';
+                    const currentDate = new Date().toLocaleDateString();
+                    const generatedBy = userSettings?.fullName || 'Cognizant Netcentric Team';
+                    
+                    // Text cleaning function
+                    const cleanText = (text) => {
+                        if (!text) return '';
+                        return text.replace(/[^\x00-\x7F]/g, '').replace(/[Ø<ß]/g, '').trim();
+                    };
+                    
+                    // Company info
+                    const companyInfo = {
+                        name: 'Cognizant Netcentric',
+                        tagline: 'Digital Experience Innovation',
+                        website: 'www.netcentric.biz',
+                        email: 'adobe@netcentric.biz',
+                        address: 'Global Headquarters\nBasel, Switzerland'
+                    };
+                    
+                    // PDF Layout constants
+                    const pageWidth = 210; // A4 width in mm
+                    const pageHeight = 297; // A4 height in mm
+                    const margin = 20;
+                    const contentWidth = pageWidth - (2 * margin);
+                    const headerHeight = 25;
+                    const footerHeight = 15;
+                    
+                    // Typography system
+                    const typography = {
+                        title: { size: 18, spacing: 15 },
+                        sectionHeader: { size: 14, spacing: 12 },
+                        bodyText: { size: 10, lineHeight: 1.4, spacing: 8 },
+                        footer: { size: 8 }
+                    };
+                    
+                    let yPos = margin;
+                    let pageNumber = 1;
+                    
+                    // Header function
+                    const addHeader = (isCover = false) => {
+                        if (!isCover) {
+                            doc.setFillColor(30, 58, 138); // Primary blue
+                            doc.rect(0, 0, pageWidth, headerHeight, 'F');
+                            doc.setTextColor(255, 255, 255);
+                            doc.setFontSize(12);
+                            doc.setFont('helvetica', 'bold');
+                            doc.text(cleanText(proposalTitle), margin, 15);
+                        }
+                    };
+                    
+                    // Footer function
+                    const addFooter = () => {
+                        const footerY = pageHeight - margin - footerHeight;
+                        
+                        // Footer separator line
+                        doc.setDrawColor(148, 163, 184); // Light gray
+                        doc.setLineWidth(0.5);
+                        doc.line(margin, footerY, pageWidth - margin, footerY);
+                        
+                        // Footer content
+                        doc.setTextColor(71, 85, 105); // Secondary gray
+                        doc.setFontSize(typography.footer.size);
+                    doc.setFont('helvetica', 'normal');
+                        
+                        const footerTextY = footerY + 8;
+                        
+                        // Left: Company info
+                        doc.text(`${companyInfo.name} | ${companyInfo.website}`, margin, footerTextY);
+                        
+                        // Center: Confidential notice
+                        const confidentialText = 'Confidential – For Client Use Only';
+                        const confidentialWidth = doc.getTextWidth(confidentialText);
+                        doc.text(confidentialText, (pageWidth - confidentialWidth) / 2, footerTextY);
+                        
+                        // Right: Page number
+                        const pageText = `Page ${pageNumber}`;
+                        const pageTextWidth = doc.getTextWidth(pageText);
+                        doc.text(pageText, pageWidth - margin - pageTextWidth, footerTextY);
+                        
+                        pageNumber++;
+                    };
+                    
+                    // ===== COVER PAGE =====
+                    addHeader(true);
+                    
+                    // COMPANY LOGO (Top Right Corner)
+                    const logoSize = 12;
+                    const logoX = pageWidth - margin - logoSize - 5;
+                    const logoY = margin + 10;
+                    doc.setFillColor(30, 58, 138); // Primary blue
+                    doc.circle(logoX, logoY, logoSize, 'F');
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('CN', logoX - 5, logoY + 5);
+                    
+                    // BACKGROUND DESIGN ELEMENT (Subtle geometric pattern)
+                    doc.setFillColor(248, 250, 252); // Light gray background
+                    doc.setDrawColor(148, 163, 184); // Light gray border
+                    doc.setLineWidth(0.5);
+                    
+                    // Large background rectangle with rounded corners effect
+                    const bgWidth = contentWidth * 0.8;
+                    const bgHeight = 160;
+                    const bgX = margin + (contentWidth - bgWidth) / 2;
+                    const bgY = margin + 80;
+                    doc.rect(bgX, bgY, bgWidth, bgHeight, 'FD');
+                    
+                    // Decorative corner elements
+                    doc.setFillColor(30, 58, 138); // Primary blue
+                    doc.setDrawColor(30, 58, 138); // Primary blue
+                    doc.setLineWidth(2);
+                    // Top left corner accent
+                    doc.line(bgX, bgY + 20, bgX + 20, bgY);
+                    doc.line(bgX, bgY + 20, bgX + 20, bgY + 20);
+                    // Bottom right corner accent
+                    doc.line(bgX + bgWidth - 20, bgY + bgHeight, bgX + bgWidth, bgY + bgHeight - 20);
+                    doc.line(bgX + bgWidth - 20, bgY + bgHeight - 20, bgX + bgWidth, bgY + bgHeight - 20);
+                    
+                    // Generate filename safely
+                    const safeTitle = cleanText(proposalTitle) || 'ComplexProposal';
+                    const safeClient = cleanText(clientName) || 'Client';
+                    const filename = `${safeTitle}_${safeClient}_Complex_${new Date().toISOString().split('T')[0]}.pdf`;
+                    
+                    // Save the PDF
+                    doc.save(filename);
+                    alert('Complex PDF generated successfully!');
+                    
+                } catch (error) {
+                    console.error('Complex PDF generation error:', error);
+                    alert('Error generating complex PDF: ' + error.message);
+                }
+            };
+
+            // Page router function
+            const renderCurrentPage = () => {
+                switch (currentPage) {
+                    case 'home':
+                        return <HomePage 
+                            handleNavigate={handleNavigate}
+                            setSelectedTemplate={setSelectedTemplate}
+                            templates={templates}
+                            sampleProposals={sampleProposals}
+                        />;
+                    case 'dashboard':
+                        return <DashboardPage />;
+                    case 'create':
+                        return <CreatePage 
+                            selectedTemplate={selectedTemplate}
+                            setSelectedTemplate={setSelectedTemplate}
+                            templates={templates}
+                            proposalData={proposalData}
+                            setProposalData={setProposalData}
+                            generateExecutiveSummary={generateExecutiveSummary}
+                            handleSaveDraft={handleSaveDraft}
+                            handleDownloadPDF={handleDownloadPDF}
+                            handleDownloadPowerPoint={handleDownloadPowerPoint}
+                        />;
+                    case 'upload-rfp':
+                        return <UploadRFPPage 
+                            rfpData={rfpData}
+                            setRfpData={setRfpData}
+                            generatedProposal={generatedProposal}
+                            setGeneratedProposal={setGeneratedProposal}
+                            handleFileUpload={handleFileUpload}
+                            analyzeRFP={analyzeRFP}
+                            generateProposalFromRFP={generateProposalFromRFP}
+                            handleDownloadPDF={handleDownloadPDF}
+                            handleDownloadPowerPoint={handleDownloadPowerPoint}
+                            rfpLibrary={rfpLibrary}
+                            currentRfpId={currentRfpId}
+                            saveCurrentRFP={saveCurrentRFP}
+                            loadRFP={loadRFP}
+                            deleteRFP={deleteRFP}
+                            createNewRFP={createNewRFP}
+                        />;
+                    case 'templates':
+                        return <TemplatesPage 
+                            templates={templates}
+                            setSelectedTemplate={setSelectedTemplate}
+                            handleNavigate={handleNavigate}
+                        />;
+                    case 'proposals':
+                        return <ProposalsPage 
+                            sampleProposals={sampleProposals}
+                        />;
+                    case 'analytics':
+                        return <AnalyticsPage />;
+                    case 'settings':
+                        return <SettingsPage 
+                            userSettings={userSettings}
+                            updateUserSettings={updateUserSettings}
+                            handleSaveSettings={handleSaveSettings}
+                            resetSettingsToDefaults={resetSettingsToDefaults}
+                            templates={templates}
+                        />;
+                    default:
+                        return <HomePage 
+                            handleNavigate={handleNavigate}
+                            setSelectedTemplate={setSelectedTemplate}
+                            templates={templates}
+                            sampleProposals={sampleProposals}
+                        />;
+                }
+            };
+
+            // Return the main React component JSX
+            return (
+                <div className="min-h-screen bg-transparent">
+                    {/* Top Navigation */}
+                    <nav className="bg-white/80 backdrop-blur-lg shadow-lg border-b border-netcentric-blue/10">
+                        <div className="max-w-7xl mx-auto px-4">
+                            <div className="flex justify-between items-center h-16">
+                                <div className="flex items-center space-x-4">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="relative">
+                                            <div className="w-8 h-8 bg-netcentric-blue rounded-sm transform rotate-12 shadow-lg"></div>
+                                            <div className="absolute -top-1 -right-1 w-5 h-5 bg-netcentric-purple rounded-sm transform -rotate-12"></div>
+                                </div>
+                                        <div>
+                                            <h1 className="text-xl font-bold text-netcentric-dark">
+                                                <span className="text-netcentric-blue">cogni</span><span className="text-netcentric-dark">zant</span>
+                                            </h1>
+                                            <span className="text-sm text-netcentric-gray font-medium">Smart Proposal Generator</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-4">
+                                    <div className="px-3 py-1 bg-gradient-to-r from-netcentric-blue to-netcentric-purple text-white text-xs font-bold rounded-full">
+                                        ADOBE PARTNER OF THE YEAR
+                                    </div>
+                                    <button
+                                        onClick={() => handleNavigate('create')}
+                                        className="bg-gradient-to-r from-netcentric-blue via-netcentric-purple to-netcentric-plum text-white px-4 py-2 rounded-xl hover:shadow-lg text-sm font-medium transition-all duration-300 transform hover:-translate-y-1"
+                                    >
+                                        + New Proposal
+                                    </button>
+                                    <div className="flex items-center space-x-3">
+                                        <span className="text-sm font-medium text-netcentric-dark hidden md:block">{userSettings.fullName}</span>
+                                        <div className="relative group">
+                                            <div className="w-10 h-10 bg-gradient-to-r from-netcentric-blue to-netcentric-purple rounded-full flex items-center justify-center cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+                                                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                                </svg>
+                                            </div>
+                                            <div className="absolute right-0 top-12 bg-netcentric-dark text-white px-3 py-2 rounded-lg text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap z-50">
+                                                User Account
+                                                <div className="absolute top-0 right-4 transform -translate-y-1 w-2 h-2 bg-netcentric-dark rotate-45"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <div className="flex">
+                        <aside className="w-64 bg-white/70 backdrop-blur-lg shadow-lg border-r border-netcentric-blue/10 min-h-screen">
+                            <div className="p-6">
+                                <nav className="space-y-2">
+                                    <button 
+                                        onClick={() => handleNavigate('home')} 
+                                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-left transition-all duration-300 ${
+                                            currentPage === 'home' ? 'bg-gradient-to-r from-netcentric-blue/10 to-netcentric-purple/10 text-netcentric-blue border border-netcentric-blue/20 shadow-md' : 'text-netcentric-gray hover:bg-netcentric-light/50 hover:text-netcentric-dark'
+                                        }`}
+                                    >
+                                        <span>🏠</span>
+                                        <span>Home</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => handleNavigate('dashboard')} 
+                                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-left transition-all duration-300 ${
+                                            currentPage === 'dashboard' ? 'bg-gradient-to-r from-netcentric-blue/10 to-netcentric-purple/10 text-netcentric-blue border border-netcentric-blue/20 shadow-md' : 'text-netcentric-gray hover:bg-netcentric-light/50 hover:text-netcentric-dark'
+                                        }`}
+                                    >
+                                        <span>📊</span>
+                                        <span>Dashboard</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => handleNavigate('create')} 
+                                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-left transition-all duration-300 ${
+                                            currentPage === 'create' ? 'bg-gradient-to-r from-netcentric-blue/10 to-netcentric-purple/10 text-netcentric-blue border border-netcentric-blue/20 shadow-md' : 'text-netcentric-gray hover:bg-netcentric-light/50 hover:text-netcentric-dark'
+                                        }`}
+                                    >
+                                        <span>📝</span>
+                                        <span>Create Proposal</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleNavigate('upload-rfp')}
+                                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-left transition-all duration-300 ${
+                                            currentPage === 'upload-rfp' ? 'bg-gradient-to-r from-netcentric-blue/10 to-netcentric-purple/10 text-netcentric-blue border border-netcentric-blue/20 shadow-md' : 'text-netcentric-gray hover:bg-netcentric-light/50 hover:text-netcentric-dark'
+                                        }`}
+                                    >
+                                        <span>📤</span>
+                                        <span>Upload RFP</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => handleNavigate('templates')} 
+                                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-left transition-all duration-300 ${
+                                            currentPage === 'templates' ? 'bg-gradient-to-r from-netcentric-blue/10 to-netcentric-purple/10 text-netcentric-blue border border-netcentric-blue/20 shadow-md' : 'text-netcentric-gray hover:bg-netcentric-light/50 hover:text-netcentric-dark'
+                                        }`}
+                                    >
+                                        <span>📋</span>
+                                        <span>Templates</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => handleNavigate('proposals')} 
+                                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-left transition-all duration-300 ${
+                                            currentPage === 'proposals' ? 'bg-gradient-to-r from-netcentric-blue/10 to-netcentric-purple/10 text-netcentric-blue border border-netcentric-blue/20 shadow-md' : 'text-netcentric-gray hover:bg-netcentric-light/50 hover:text-netcentric-dark'
+                                        }`}
+                                    >
+                                        <span>📁</span>
+                                        <span>All Proposals</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => handleNavigate('analytics')} 
+                                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-left transition-all duration-300 ${
+                                            currentPage === 'analytics' ? 'bg-gradient-to-r from-netcentric-blue/10 to-netcentric-purple/10 text-netcentric-blue border border-netcentric-blue/20 shadow-md' : 'text-netcentric-gray hover:bg-netcentric-light/50 hover:text-netcentric-dark'
+                                        }`}
+                                    >
+                                        <span>📈</span>
+                                        <span>Analytics</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => handleNavigate('settings')} 
+                                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-left transition-all duration-300 ${
+                                            currentPage === 'settings' ? 'bg-gradient-to-r from-netcentric-blue/10 to-netcentric-purple/10 text-netcentric-blue border border-netcentric-blue/20 shadow-md' : 'text-netcentric-gray hover:bg-netcentric-light/50 hover:text-netcentric-dark'
+                                        }`}
+                                    >
+                                        <span>⚙️</span>
+                                        <span>Settings</span>
+                                    </button>
+                                </nav>
+
+                                <div className="mt-8 p-4 bg-gradient-to-r from-netcentric-blue/10 to-netcentric-purple/10 rounded-2xl border border-netcentric-blue/20">
+                                    <h3 className="text-sm font-medium text-netcentric-dark mb-2">Quick Actions</h3>
+                                    <div className="space-y-2">
+                                        <button 
+                                            onClick={() => handleNavigate('create')}
+                                            className="w-full text-left text-xs text-netcentric-blue hover:text-netcentric-purple transition-colors duration-200"
+                                        >
+                                            📝 New Proposal
+                                        </button>
+                                        <button 
+                                            onClick={handleDownloadPDF}
+                                            className="w-full text-left text-xs text-netcentric-blue hover:text-netcentric-purple transition-colors duration-200"
+                                        >
+                                            📄 Export PDF
+                                        </button>
+                                        <button 
+                                            onClick={handleDownloadPowerPoint}
+                                            className="w-full text-left text-xs text-netcentric-blue hover:text-netcentric-purple transition-colors duration-200"
+                                        >
+                                            📊 Export PowerPoint
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </aside>
+
+                        <main className="flex-1 p-6">
+                            <div className="max-w-6xl mx-auto">
+                                {renderCurrentPage()}
+                            </div>
+                        </main>
+                    </div>
+                </div>
+            );
+        };
+
+        // React Component Render
+        ReactDOM.render(<SmartProposalApp />, document.getElementById('root'));
+    </script>
+</body>
+</html> 

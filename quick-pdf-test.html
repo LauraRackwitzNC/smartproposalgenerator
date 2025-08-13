@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick PDF Test</title>
+    <!-- PDF Generation - Multiple CDN Fallbacks -->
+    <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script>
+        // Fallback CDN if first one fails
+        if (!window.jspdf) {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>');
+        }
+    </script>
+    <script>
+        // Second fallback
+        if (!window.jspdf) {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"><\/script>');
+        }
+    </script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
+        button { background: #1e40af; color: white; padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin: 10px; }
+        button:hover { background: #1d4ed8; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #dcfce7; color: #166534; }
+        .error { background: #fef2f2; color: #dc2626; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Ultra Quick PDF Test</h1>
+    <p>This is the simplest possible PDF test. If this doesn't work, we have a fundamental issue.</p>
+    
+    <button onclick="generatePDF()">📄 Generate PDF NOW</button>
+    
+    <div id="status"></div>
+
+    <script>
+        function log(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            const className = type === 'error' ? 'error' : 'success';
+            statusDiv.innerHTML += `<div class="status ${className}">${message}</div>`;
+            console.log(message);
+        }
+
+        function generatePDF() {
+            log('🔥 Starting ultra simple PDF test...');
+            
+            try {
+                // Check if jsPDF exists
+                if (!window.jspdf) {
+                    log('❌ ERROR: jsPDF library not found!', 'error');
+                    return;
+                }
+                
+                log('✅ jsPDF library found');
+                
+                // Get jsPDF constructor
+                const { jsPDF } = window.jspdf;
+                log('✅ jsPDF constructor available');
+                
+                // Create document
+                const doc = new jsPDF();
+                log('✅ PDF document created');
+                
+                // Add content
+                doc.setFontSize(20);
+                doc.text('PDF TEST SUCCESS!', 20, 30);
+                doc.setFontSize(12);
+                doc.text('This PDF was generated at: ' + new Date().toString(), 20, 50);
+                doc.text('If you can see this, PDF generation is working!', 20, 70);
+                log('✅ Content added to PDF');
+                
+                // Save
+                doc.save('test-success.pdf');
+                log('✅ PDF saved! Check your downloads folder.', 'success');
+                
+            } catch (error) {
+                log(`❌ ERROR: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
+
+        // Auto-test on load
+        window.onload = function() {
+            log('Page loaded. Ready to test PDF generation.');
+            if (window.jspdf) {
+                log('✅ jsPDF library detected on page load');
+            } else {
+                log('❌ jsPDF library NOT detected on page load', 'error');
+            }
+        };
+    </script>
+</body>
+</html>

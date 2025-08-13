@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛡️ Bulletproof PDF Test</title>
+    
+    <!-- PDF Generation - Multiple CDN Fallbacks + Local Backup -->
+    <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script>
+        // Fallback CDN if first one fails
+        if (!window.jspdf) {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>');
+        }
+    </script>
+    <script>
+        // Second fallback
+        if (!window.jspdf) {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"><\/script>');
+        }
+    </script>
+    <script>
+        // Local fallback as last resort
+        if (!window.jspdf) {
+            document.write('<script src="jspdf.min.js"><\/script>');
+        }
+    </script>
+    
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+        button { 
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24); 
+            color: white; 
+            padding: 15px 30px; 
+            border: none; 
+            border-radius: 25px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            margin: 10px; 
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        .status { 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 10px; 
+            font-weight: bold;
+            backdrop-filter: blur(10px);
+        }
+        .success { 
+            background: rgba(46, 213, 115, 0.3); 
+            color: #27ae60; 
+            border: 1px solid rgba(46, 213, 115, 0.5);
+        }
+        .error { 
+            background: rgba(231, 76, 60, 0.3); 
+            color: #e74c3c; 
+            border: 1px solid rgba(231, 76, 60, 0.5);
+        }
+        .info {
+            background: rgba(52, 152, 219, 0.3); 
+            color: #3498db; 
+            border: 1px solid rgba(52, 152, 219, 0.5);
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .subtitle {
+            text-align: center;
+            font-size: 1.2em;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Bulletproof PDF Test</h1>
+        <p class="subtitle">This version has multiple CDN fallbacks + local backup</p>
+        
+        <div style="text-align: center;">
+            <button onclick="testLibraryLoading()">🔍 Test Library Loading</button>
+            <button onclick="generatePDF()">🚀 Generate PDF</button>
+            <button onclick="runFullDiagnostic()">🔬 Full Diagnostic</button>
+        </div>
+        
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            const timestamp = new Date().toLocaleTimeString();
+            statusDiv.innerHTML += `<div class="status ${type}">[${timestamp}] ${message}</div>`;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function testLibraryLoading() {
+            log('🔍 Testing jsPDF library loading...', 'info');
+            
+            if (typeof window.jspdf === 'undefined') {
+                log('❌ CRITICAL: window.jspdf is still undefined after all fallbacks!', 'error');
+                log('This indicates a network/CDN issue or browser blocking scripts.', 'error');
+                return false;
+            }
+            
+            if (typeof window.jspdf.jsPDF === 'undefined') {
+                log('❌ ERROR: window.jspdf.jsPDF constructor missing', 'error');
+                return false;
+            }
+            
+            log('✅ SUCCESS: jsPDF library loaded successfully!', 'success');
+            log(`📋 Library info: ${typeof window.jspdf}`, 'info');
+            log(`📋 Constructor: ${typeof window.jspdf.jsPDF}`, 'info');
+            
+            // Test constructor
+            try {
+                const { jsPDF } = window.jspdf;
+                const testDoc = new jsPDF();
+                log('✅ SUCCESS: jsPDF constructor works!', 'success');
+                return true;
+            } catch (error) {
+                log(`❌ ERROR: jsPDF constructor failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        function generatePDF() {
+            log('🚀 Starting bulletproof PDF generation...', 'info');
+            
+            if (!testLibraryLoading()) {
+                log('❌ Cannot generate PDF - library not loaded', 'error');
+                return;
+            }
+            
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                // Add colorful content
+                doc.setFontSize(24);
+                doc.setTextColor(255, 0, 0); // Red
+                doc.text('🎉 PDF GENERATION SUCCESS!', 20, 30);
+                
+                doc.setFontSize(16);
+                doc.setTextColor(0, 0, 255); // Blue
+                doc.text('This PDF was generated using bulletproof fallbacks', 20, 50);
+                
+                doc.setFontSize(12);
+                doc.setTextColor(0, 0, 0); // Black
+                doc.text('Generated at: ' + new Date().toString(), 20, 70);
+                doc.text('If you can see this, your PDF generation is working perfectly!', 20, 85);
+                doc.text('This means the Smart Proposal Generator should work too.', 20, 100);
+                
+                // Add some fancy content
+                doc.setFontSize(14);
+                doc.setTextColor(0, 128, 0); // Green
+                doc.text('🔧 Technical Details:', 20, 120);
+                doc.setFontSize(10);
+                doc.setTextColor(0, 0, 0);
+                doc.text('• jsPDF Library: Loaded successfully', 20, 135);
+                doc.text('• Browser: ' + navigator.userAgent.split(')')[0] + ')', 20, 145);
+                doc.text('• Date: ' + new Date().toLocaleDateString(), 20, 155);
+                doc.text('• Time: ' + new Date().toLocaleTimeString(), 20, 165);
+                
+                // Save with timestamp
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `bulletproof-test-${timestamp}.pdf`;
+                
+                doc.save(filename);
+                log(`✅ SUCCESS: PDF saved as "${filename}"`, 'success');
+                log('🎯 Check your Downloads folder!', 'success');
+                
+            } catch (error) {
+                log(`❌ GENERATION ERROR: ${error.message}`, 'error');
+                console.error('Full error details:', error);
+            }
+        }
+
+        function runFullDiagnostic() {
+            log('🔬 Running full diagnostic...', 'info');
+            log('================================', 'info');
+            
+            // Test 1: Library loading
+            log('TEST 1: Library Loading', 'info');
+            const libraryOk = testLibraryLoading();
+            
+            // Test 2: Browser info
+            log('TEST 2: Browser Environment', 'info');
+            log(`Browser: ${navigator.userAgent}`, 'info');
+            log(`Platform: ${navigator.platform}`, 'info');
+            log(`Cookies enabled: ${navigator.cookieEnabled}`, 'info');
+            log(`Online: ${navigator.onLine}`, 'info');
+            
+            // Test 3: Network test
+            log('TEST 3: Network Connectivity', 'info');
+            fetch('https://httpbin.org/get')
+                .then(() => log('✅ Network connectivity: OK', 'success'))
+                .catch(() => log('⚠️ Network connectivity: Issues detected', 'error'));
+            
+            // Test 4: PDF generation
+            if (libraryOk) {
+                log('TEST 4: PDF Generation', 'info');
+                generatePDF();
+            } else {
+                log('TEST 4: SKIPPED - Library not loaded', 'error');
+            }
+            
+            log('================================', 'info');
+            log('🏁 Diagnostic complete!', 'info');
+        }
+
+        // Auto-run on page load
+        window.onload = function() {
+            log('🛡️ Bulletproof PDF Test initialized', 'info');
+            
+            // Wait a moment for all scripts to load
+            setTimeout(() => {
+                log('🔍 Auto-testing library loading...', 'info');
+                testLibraryLoading();
+            }, 1000);
+        };
+    </script>
+</body>
+</html>

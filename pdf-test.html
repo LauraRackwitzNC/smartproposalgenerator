@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Generation Test</title>
+    
+    <!-- PDF Generation - Multiple CDN Fallbacks -->
+    <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script>
+        // Fallback CDN if first one fails
+        if (!window.jspdf) {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>');
+        }
+    </script>
+    <script>
+        // Second fallback
+        if (!window.jspdf) {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"><\/script>');
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .test-card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            background: #1e40af;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success { background: #dcfce7; color: #166534; }
+        .error { background: #fef2f2; color: #dc2626; }
+        .info { background: #dbeafe; color: #1d4ed8; }
+    </style>
+</head>
+<body>
+    <div class="test-card">
+        <h1>🔬 PDF Generation Diagnostic Test</h1>
+        <p>This page will help us identify what's wrong with PDF generation.</p>
+        
+        <h3>Tests:</h3>
+        <button onclick="testLibraryLoading()">1. Test jsPDF Library Loading</button>
+        <button onclick="testBasicPDF()">2. Test Basic PDF Generation</button>
+        <button onclick="testWithData()">3. Test PDF with Sample Data</button>
+        <button onclick="testSmartGeneratorPDF()">4. Test Smart Generator PDF Function</button>
+        
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function logStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            const timestamp = new Date().toLocaleTimeString();
+            statusDiv.innerHTML += `<div class="status ${type}">[${timestamp}] ${message}</div>`;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function testLibraryLoading() {
+            logStatus('Testing jsPDF library loading...', 'info');
+            
+            if (typeof window.jspdf === 'undefined') {
+                logStatus('❌ ERROR: window.jspdf is undefined - jsPDF library not loaded!', 'error');
+                return false;
+            }
+            
+            if (typeof window.jspdf.jsPDF === 'undefined') {
+                logStatus('❌ ERROR: window.jspdf.jsPDF is undefined - jsPDF constructor not available!', 'error');
+                return false;
+            }
+            
+            logStatus('✅ SUCCESS: jsPDF library loaded correctly', 'success');
+            logStatus(`Library version: ${window.jspdf.jsPDF.version || 'Unknown'}`, 'info');
+            return true;
+        }
+
+        function testBasicPDF() {
+            logStatus('Testing basic PDF generation...', 'info');
+            
+            if (!testLibraryLoading()) {
+                return;
+            }
+            
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                // Add simple content
+                doc.setFontSize(20);
+                doc.text('Test PDF Document', 20, 30);
+                doc.setFontSize(12);
+                doc.text('This is a basic test of PDF generation.', 20, 50);
+                doc.text('Generated on: ' + new Date().toLocaleString(), 20, 70);
+                
+                // Try to save
+                doc.save('basic-test.pdf');
+                logStatus('✅ SUCCESS: Basic PDF generated and downloaded!', 'success');
+                
+            } catch (error) {
+                logStatus(`❌ ERROR in basic PDF generation: ${error.message}`, 'error');
+                console.error('Basic PDF Error:', error);
+            }
+        }
+
+        function testWithData() {
+            logStatus('Testing PDF with sample proposal data...', 'info');
+            
+            if (!testLibraryLoading()) {
+                return;
+            }
+            
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                // Sample data
+                const sampleData = {
+                    proposalTitle: 'Test Proposal',
+                    clientName: 'Test Client',
+                    currentDate: new Date().toLocaleDateString(),
+                    generatedBy: 'Test User',
+                    executiveSummary: 'This is a test executive summary for the PDF generation test.'
+                };
+                
+                let yPos = 20;
+                
+                // Title
+                doc.setFontSize(18);
+                doc.setFont('helvetica', 'bold');
+                doc.text(sampleData.proposalTitle, 20, yPos);
+                yPos += 20;
+                
+                // Client info
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'normal');
+                doc.text('Prepared for: ' + sampleData.clientName, 20, yPos);
+                yPos += 10;
+                doc.text('Date: ' + sampleData.currentDate, 20, yPos);
+                yPos += 10;
+                doc.text('Generated by: ' + sampleData.generatedBy, 20, yPos);
+                yPos += 20;
+                
+                // Executive Summary
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Executive Summary', 20, yPos);
+                yPos += 10;
+                
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                const textLines = doc.splitTextToSize(sampleData.executiveSummary, 170);
+                doc.text(textLines, 20, yPos);
+                
+                // Save PDF
+                doc.save('sample-data-test.pdf');
+                logStatus('✅ SUCCESS: PDF with sample data generated!', 'success');
+                
+            } catch (error) {
+                logStatus(`❌ ERROR in sample data PDF: ${error.message}`, 'error');
+                console.error('Sample Data PDF Error:', error);
+            }
+        }
+
+        function testSmartGeneratorPDF() {
+            logStatus('Testing Smart Generator PDF function logic...', 'info');
+            
+            if (!testLibraryLoading()) {
+                return;
+            }
+            
+            // Mock the data structures that the Smart Generator uses
+            const mockProposalData = {
+                customerContext: {
+                    customerName: 'Test Customer'
+                },
+                opportunityDetails: {
+                    opportunityName: 'Test Opportunity'
+                },
+                proposedSolution: {
+                    overview: 'This is a test solution overview.'
+                }
+            };
+            
+            const mockGeneratedProposal = {
+                coverLetter: 'This is a test cover letter.',
+                generationComplete: true
+            };
+            
+            const mockUserSettings = {
+                fullName: 'Test User'
+            };
+            
+            try {
+                // Replicate the exact logic from the Smart Generator
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                // Get proposal data safely (same logic as Smart Generator)
+                const proposalTitle = mockProposalData?.opportunityDetails?.opportunityName || 
+                                    (mockProposalData?.customerContext?.customerName ? mockProposalData.customerContext.customerName + ' Proposal' : null) || 
+                                    'Business Proposal';
+                const clientName = mockProposalData?.customerContext?.customerName || 'Valued Client';
+                const currentDate = new Date().toLocaleDateString();
+                const generatedBy = mockUserSettings?.fullName || 'Cognizant Netcentric Team';
+                
+                // Simple PDF content (same as Smart Generator)
+                let yPos = 20;
+                
+                // Title
+                doc.setFontSize(18);
+                doc.setFont('helvetica', 'bold');
+                doc.text(proposalTitle, 20, yPos);
+                yPos += 20;
+                
+                // Client info
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'normal');
+                doc.text('Prepared for: ' + clientName, 20, yPos);
+                yPos += 10;
+                doc.text('Date: ' + currentDate, 20, yPos);
+                yPos += 10;
+                doc.text('Generated by: ' + generatedBy, 20, yPos);
+                yPos += 20;
+                
+                // Executive Summary
+                const executiveSummary = mockProposalData?.proposedSolution?.overview || 
+                                       mockGeneratedProposal?.coverLetter || 
+                                       'Executive summary content will appear here.';
+                
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Executive Summary', 20, yPos);
+                yPos += 10;
+                
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                const textLines = doc.splitTextToSize(executiveSummary, 170);
+                doc.text(textLines, 20, yPos);
+                
+                // Generate filename
+                const cleanTitle = proposalTitle.replace(/[^a-zA-Z0-9]/g, '_');
+                const cleanClient = clientName.replace(/[^a-zA-Z0-9]/g, '_');
+                const filename = `${cleanTitle}_${cleanClient}_${new Date().toISOString().split('T')[0]}.pdf`;
+                
+                // Save PDF
+                doc.save(filename);
+                logStatus('✅ SUCCESS: Smart Generator PDF function logic works perfectly!', 'success');
+                logStatus(`Generated filename: ${filename}`, 'info');
+                
+            } catch (error) {
+                logStatus(`❌ ERROR in Smart Generator PDF logic: ${error.message}`, 'error');
+                console.error('Smart Generator PDF Error:', error);
+                console.error('Error stack:', error.stack);
+            }
+        }
+
+        // Auto-run library test on page load
+        window.onload = function() {
+            logStatus('PDF Generation Diagnostic Test Started', 'info');
+            testLibraryLoading();
+        };
+    </script>
+</body>
+</html>
